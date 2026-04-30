@@ -4,6 +4,7 @@ import csv
 import argparse
 from typing import List, Dict, Tuple, Optional
 
+import numpy as np
 import torch
 from PIL import Image
 from tqdm import tqdm
@@ -127,6 +128,84 @@ def prob_malignant_from_logits(
     return float(p1_norm), {"logp_0": lp0, "logp_1": lp1, "cand0": c0, "cand1": c1}
 
 
+def compute_metrics(y_true: List[int], y_prob: List[float], y_pred: List[int]) -> Dict[str, float]:
+    auroc = roc_auc_score(y_true, y_prob) if len(set(y_true)) == 2 else float("nan")
+    auprc = average_precision_score(y_true, y_prob) if len(set(y_true)) == 2 else float("nan")
+
+    acc = accuracy_score(y_true, y_pred)
+    f1 = f1_score(y_true, y_pred, zero_division=0)
+
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
+    sensitivity = tp / (tp + fn + 1e-12)
+    specificity = tn / (tn + fp + 1e-12)
+
+    return {
+        "auroc": float(auroc),
+        "auprc": float(auprc),
+        "accuracy": float(acc),
+        "f1": float(f1),
+        "sensitivity": float(sensitivity),
+        "specificity": float(specificity),
+        "tn": int(tn),
+        "fp": int(fp),
+        "fn": int(fn),
+        "tp": int(tp),
+    }
+
+
+def bootstrap_metric_cis(
+    y_true: List[int],
+    y_prob: List[float],
+    threshold: float,
+    n_bootstrap: int = 2000,
+    alpha: float = 0.95,
+    seed: int = 42,
+) -> Dict[str, Tuple[float, float]]:
+    y_true_arr = np.asarray(y_true)
+    y_prob_arr = np.asarray(y_prob)
+    n = len(y_true_arr)
+    rng = np.random.default_rng(seed)
+
+    metric_samples = {
+        "auroc": [],
+        "auprc": [],
+        "accuracy": [],
+        "f1": [],
+        "sensitivity": [],
+        "specificity": [],
+    }
+
+    for _ in range(n_bootstrap):
+        indices = rng.integers(0, n, size=n)
+        sample_y_true = y_true_arr[indices]
+        sample_y_prob = y_prob_arr[indices]
+        sample_y_pred = (sample_y_prob >= threshold).astype(int)
+
+        metrics = compute_metrics(
+            sample_y_true.tolist(),
+            sample_y_prob.tolist(),
+            sample_y_pred.tolist(),
+        )
+
+        for key in metric_samples:
+            value = metrics[key]
+            if not np.isnan(value):
+                metric_samples[key].append(value)
+
+    lower_q = (1.0 - alpha) / 2.0
+    upper_q = 1.0 - lower_q
+    cis: Dict[str, Tuple[float, float]] = {}
+    for key, values in metric_samples.items():
+        if len(values) == 0:
+            cis[key] = (float("nan"), float("nan"))
+        else:
+            cis[key] = (
+                float(np.quantile(values, lower_q)),
+                float(np.quantile(values, upper_q)),
+            )
+    return cis
+
+
 # ----------------------------
 # Main
 # ----------------------------
@@ -148,6 +227,12 @@ def main():
                     help="Decision threshold on P(malignant)")
     ap.add_argument("--limit", type=int, default=-1,
                     help="Run only first N samples for quick test (-1 for all)")
+    ap.add_argument("--ci_bootstrap", type=int, default=2000,
+                    help="Number of bootstrap resamples for confidence intervals")
+    ap.add_argument("--ci_alpha", type=float, default=0.95,
+                    help="Confidence level for intervals, e.g. 0.95")
+    ap.add_argument("--ci_seed", type=int, default=42,
+                    help="Random seed for bootstrap confidence intervals")
     args = ap.parse_args()
 
     labels = load_labels(args.label_json)
@@ -237,32 +322,27 @@ def main():
     if len(y_true) == 0:
         raise RuntimeError("No valid samples were evaluated (all missing/bad?). Check paths.")
 
-    # Metrics (positive class = malignant=1)
-    auroc = roc_auc_score(y_true, y_prob) if len(set(y_true)) == 2 else float("nan")
-    auprc = average_precision_score(y_true, y_prob) if len(set(y_true)) == 2 else float("nan")
-
-    acc = accuracy_score(y_true, y_pred)
-    prec = precision_score(y_true, y_pred, zero_division=0)
-    rec = recall_score(y_true, y_pred, zero_division=0)  # = sensitivity
-    f1 = f1_score(y_true, y_pred, zero_division=0)
-
-    tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
-    sensitivity = tp / (tp + fn + 1e-12)
-    specificity = tn / (tn + fp + 1e-12)
+    metrics = compute_metrics(y_true, y_prob, y_pred)
+    cis = bootstrap_metric_cis(
+        y_true=y_true,
+        y_prob=y_prob,
+        threshold=args.threshold,
+        n_bootstrap=args.ci_bootstrap,
+        alpha=args.ci_alpha,
+        seed=args.ci_seed,
+    )
 
     print("\n==== MedGemma Thyroid Binary Classification Metrics (pos=malignant=1) ====")
     print(f"Evaluated samples: {len(y_true)}")
     print(f"Missing files:     {missing_files}")
     print(f"Bad images:        {bad_images}")
-    print(f"AUROC:             {auroc:.6f}")
-    print(f"AUPRC:             {auprc:.6f}")
-    print(f"Acc:               {acc:.6f}")
-    print(f"Prec:              {prec:.6f}")
-    print(f"Recall:            {rec:.6f}")
-    print(f"F1:                {f1:.6f}")
-    print(f"Sensitivity:       {sensitivity:.6f}")
-    print(f"Specificity:       {specificity:.6f}")
-    print(f"Confusion (tn fp fn tp): {tn} {fp} {fn} {tp}")
+    print(f"AUROC:             {metrics['auroc']:.6f} (95% CI {cis['auroc'][0]:.6f}-{cis['auroc'][1]:.6f})")
+    print(f"AUPRC:             {metrics['auprc']:.6f} (95% CI {cis['auprc'][0]:.6f}-{cis['auprc'][1]:.6f})")
+    print(f"Acc:               {metrics['accuracy']:.6f} (95% CI {cis['accuracy'][0]:.6f}-{cis['accuracy'][1]:.6f})")
+    print(f"F1:                {metrics['f1']:.6f} (95% CI {cis['f1'][0]:.6f}-{cis['f1'][1]:.6f})")
+    print(f"Sensitivity:       {metrics['sensitivity']:.6f} (95% CI {cis['sensitivity'][0]:.6f}-{cis['sensitivity'][1]:.6f})")
+    print(f"Specificity:       {metrics['specificity']:.6f} (95% CI {cis['specificity'][0]:.6f}-{cis['specificity'][1]:.6f})")
+    print(f"Confusion (tn fp fn tp): {metrics['tn']} {metrics['fp']} {metrics['fn']} {metrics['tp']}")
     print(f"Saved per-image predictions to: {args.out_csv}")
 
 
