@@ -154,10 +154,10 @@ cd /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/my_vllms/medgemma
 
 python medgemma_thyroid_binary_train.py \
   --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
-  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/TN3K/images \
-  --train_json /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/my_vllms/my_json/tn3k_train_label.json \
-  --test_json /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/my_vllms/my_json/tn3k_test_label.json \
-  --output_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/my_vllms/medgemma/medgemma_tn3k_lora \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/train/images \
+  --train_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/train/dataset_3_train_label.json \
+  --test_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/train/dataset_3_test_label.json \
+  --output_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_dataset_3_lora \
   --dtype bf16 \
   --epochs 3 \
   --per_device_train_batch_size 1 \

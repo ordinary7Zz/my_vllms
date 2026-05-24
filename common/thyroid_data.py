@@ -1,13 +1,13 @@
 import json
 import os
 from collections import Counter
-from typing import Dict, Iterable, List, Tuple
+from typing import Dict, Iterable, List, Tuple, Union
 
 from PIL import Image
 from torch.utils.data import Dataset
 
 
-Record = Dict[str, int | str]
+Record = Dict[str, Union[int, str]]
 
 
 def load_labels(label_json: str) -> List[Record]:
@@ -43,7 +43,7 @@ def class_distribution(records: Iterable[Record]) -> Dict[int, int]:
     return {0: counts.get(0, 0), 1: counts.get(1, 0)}
 
 
-def dataset_summary(records: List[Record]) -> Dict[str, int | Dict[int, int]]:
+def dataset_summary(records: List[Record]) -> Dict[str, Union[int, Dict[int, int]]]:
     return {
         "num_samples": len(records),
         "class_distribution": class_distribution(records),

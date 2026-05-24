@@ -1,10 +1,10 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
 from sklearn.metrics import accuracy_score, average_precision_score, confusion_matrix, f1_score, roc_auc_score
 
 
-MetricsDict = Dict[str, float | int]
+MetricsDict = Dict[str, Union[float, int]]
 
 
 def compute_metrics(y_true: List[int], y_prob: List[float], y_pred: List[int]) -> MetricsDict:

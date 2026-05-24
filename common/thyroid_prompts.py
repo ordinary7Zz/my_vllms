@@ -1,5 +1,7 @@
+from typing import Optional
+
 MEDGEMMA_PROMPT = (
-    "<start_of_image>\n"
+"<start_of_image>\n"
     "You are a medical imaging assistant.\n"
     "Task: Thyroid ultrasound nodule malignancy classification.\n"
     "Output exactly one character: 0 or 1.\n"
@@ -25,7 +27,7 @@ def label_to_answer_text(label: int, leading_space: bool = True) -> str:
     return (" " if leading_space else "") + str(int(label))
 
 
-def build_qwen3_messages(image, answer_text: str | None = None):
+def build_qwen3_messages(image, answer_text: Optional[str] = None):
     messages = [
         {"role": "system", "content": [{"type": "text", "text": QWEN3_SYSTEM_TEXT}]},
         {
