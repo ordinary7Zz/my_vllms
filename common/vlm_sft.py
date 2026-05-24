@@ -171,14 +171,20 @@ def build_training_args(args, metric_for_best_model: str = "eval_auroc") -> Trai
     )
 
 
-def build_dataset_pair(train_records, test_records, image_dir: str, answer_with_space: bool = True):
-    print_dataset_report("train", train_records, image_dir)
-    print_dataset_report("test", test_records, image_dir)
+def build_dataset_pair(
+    train_records,
+    test_records,
+    train_image_dir: str,
+    test_image_dir: str,
+    answer_with_space: bool = True,
+):
+    print_dataset_report("train", train_records, train_image_dir)
+    print_dataset_report("test", test_records, test_image_dir)
     overlap = find_filename_overlap(train_records, test_records)
     if overlap:
         print(f"[warning] train/test filename overlap: {len(overlap)} samples")
-    train_dataset = ThyroidBinaryDataset(train_records, image_dir=image_dir, answer_with_space=answer_with_space)
-    test_dataset = ThyroidBinaryDataset(test_records, image_dir=image_dir, answer_with_space=answer_with_space)
+    train_dataset = ThyroidBinaryDataset(train_records, image_dir=train_image_dir, answer_with_space=answer_with_space)
+    test_dataset = ThyroidBinaryDataset(test_records, image_dir=test_image_dir, answer_with_space=answer_with_space)
     return train_dataset, test_dataset
 
 

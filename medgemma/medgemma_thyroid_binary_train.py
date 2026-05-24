@@ -27,7 +27,8 @@ from common.vlm_sft import (
 def parse_args():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model_dir", type=str, required=True)
-    ap.add_argument("--image_dir", type=str, required=True)
+    ap.add_argument("--train_image_dir", type=str, required=True)
+    ap.add_argument("--test_image_dir", type=str, required=True)
     ap.add_argument("--train_json", type=str, required=True)
     ap.add_argument("--test_json", type=str, required=True)
     ap.add_argument("--output_dir", type=str, required=True)
@@ -61,7 +62,13 @@ def main():
     processor = AutoProcessor.from_pretrained(args.model_dir, use_fast=False)
     train_records = load_labels(args.train_json)
     test_records = load_labels(args.test_json)
-    train_dataset, test_dataset = build_dataset_pair(train_records, test_records, args.image_dir, answer_with_space=True)
+    train_dataset, test_dataset = build_dataset_pair(
+        train_records,
+        test_records,
+        args.train_image_dir,
+        args.test_image_dir,
+        answer_with_space=True,
+    )
 
     model = load_model_with_lora(
         model_cls=AutoModelForImageTextToText,

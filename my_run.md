@@ -147,22 +147,26 @@ python qwen3_vl_thyroid_binary_eval.py \
 
 ## 五、微调命令示例
 
+以下训练命令按单张 4090 24GB 显卡做了较快的默认配置：优先使用空闲卡，增大 batch size，减少梯度累积，并开启多进程数据加载。
+
 ### 1. 微调 MedGemma
 
 ```bash
 cd /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/my_vllms/medgemma
 
-python medgemma_thyroid_binary_train.py \
+CUDA_VISIBLE_DEVICES=1 python medgemma_thyroid_binary_train.py \
   --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
-  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/train/images \
+  --train_image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/train/images \
+  --test_image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/test/images \
   --train_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/train/dataset_3_train_label.json \
-  --test_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/train/dataset_3_test_label.json \
+  --test_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/test/dataset_3_test_label.json \
   --output_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_dataset_3_lora \
   --dtype bf16 \
-  --epochs 3 \
+  --epochs 2 \
   --per_device_train_batch_size 1 \
   --per_device_eval_batch_size 1 \
   --gradient_accumulation_steps 8 \
+  --num_workers 4 \
   --learning_rate 2e-4 \
   --load_best_model_at_end
 ```
@@ -172,10 +176,10 @@ python medgemma_thyroid_binary_train.py \
 ```bash
 python medgemma_thyroid_binary_eval.py \
   --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
-  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/my_vllms/medgemma/medgemma_tn3k_lora \
-  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/TN3K/images \
-  --label_json /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/my_vllms/my_json/tn3k_test_label.json \
-  --out_csv medgemma_tn3k_ft_preds.csv \
+  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_dataset_3_lora \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/test/images \
+  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/test/dataset_3_test_label.json \
+  --out_csv medgemma_dataset_3_ft_preds.csv \
   --dtype bf16
 ```
 
@@ -184,18 +188,21 @@ python medgemma_thyroid_binary_eval.py \
 ```bash
 cd /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/my_vllms/qwen3
 
-python qwen3_vl_thyroid_binary_train.py \
+CUDA_VISIBLE_DEVICES=2 python qwen3_vl_thyroid_binary_train.py \
   --model_dir /mnt/wangbd8/workspace/Qwen3-VL-8B-Instruct \
-  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/TN3K/images \
-  --train_json /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/my_vllms/my_json/tn3k_train_label.json \
-  --test_json /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/my_vllms/my_json/tn3k_test_label.json \
-  --output_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/my_vllms/qwen3/qwen3_tn3k_lora \
+  --train_image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/train/images \
+  --test_image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/test/images \
+  --train_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/train/dataset_3_train_label.json \
+  --test_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/test/dataset_3_test_label.json \
+  --output_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_dataset_3_lora \
   --dtype bf16 \
   --use_qlora \
+  --attn_impl flash_attention_2 \
   --epochs 3 \
   --per_device_train_batch_size 1 \
   --per_device_eval_batch_size 1 \
   --gradient_accumulation_steps 8 \
+  --num_workers 4 \
   --learning_rate 2e-4 \
   --load_best_model_at_end
 ```
