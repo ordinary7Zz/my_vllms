@@ -15,10 +15,12 @@ from common.thyroid_data import load_labels
 from common.thyroid_prompts import MEDGEMMA_PROMPT
 from common.vlm_sft import (
     build_dataset_pair,
+    build_prediction_callback,
     build_training_args,
     load_model_with_lora,
     medgemma_collate_fn,
     parse_target_modules,
+    prob_malignant_from_medgemma_logits,
     save_processor,
     ThyroidTrainer,
 )
@@ -89,6 +91,12 @@ def main():
         train_dataset=train_dataset,
         eval_dataset=test_dataset,
         data_collator=lambda batch: medgemma_collate_fn(processor, batch),
+        prediction_callback=build_prediction_callback(
+            records=test_records,
+            image_dir=args.test_image_dir,
+            processor=processor,
+            probability_fn=prob_malignant_from_medgemma_logits,
+        ),
     )
 
     trainer.train()

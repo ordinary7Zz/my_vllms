@@ -1,12 +1,19 @@
 import os
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch
+from PIL import Image
 from peft import LoraConfig, PeftModel, TaskType, get_peft_model, prepare_model_for_kbit_training
 from transformers import BitsAndBytesConfig, Trainer, TrainingArguments
 
-from common.thyroid_data import ThyroidBinaryDataset, find_filename_overlap, print_dataset_report
+from common.thyroid_data import (
+    ThyroidBinaryDataset,
+    find_filename_overlap,
+    print_dataset_report,
+    resolve_image_path,
+    safe_open_image,
+)
 from common.thyroid_metrics import compute_metrics
 from common.thyroid_prompts import MEDGEMMA_PROMPT, build_qwen3_messages
 
@@ -204,6 +211,104 @@ def summarize_predictions(labels: Sequence[int], probabilities: Sequence[float],
     preds = [1 if p >= threshold else 0 for p in probabilities]
     metrics = compute_metrics(list(labels), list(probabilities), preds)
     return {k: float(v) if isinstance(v, (int, float, np.floating)) else v for k, v in metrics.items()}
+
+
+@torch.inference_mode()
+def score_string_logprob(model, tokenizer, base_inputs: Dict[str, torch.Tensor], target_text: str) -> float:
+    target_ids = tokenizer.encode(target_text, add_special_tokens=False)
+    if not target_ids:
+        raise ValueError(f"target_text tokenized to empty sequence: {target_text!r}")
+
+    out = model(**base_inputs, use_cache=True)
+    next_logits = out.logits[:, -1, :]
+    past = out.past_key_values
+    logprob = 0.0
+
+    for token_id in target_ids:
+        step_logprob = torch.log_softmax(next_logits, dim=-1)[0, token_id].item()
+        logprob += step_logprob
+        input_ids = torch.tensor([[token_id]], device=next_logits.device, dtype=torch.long)
+        out = model(input_ids=input_ids, past_key_values=past, use_cache=True)
+        next_logits = out.logits[:, -1, :]
+        past = out.past_key_values
+
+    return float(logprob)
+
+
+def build_qwen3_vl_inputs(processor, image: Image.Image) -> Dict[str, torch.Tensor]:
+    messages = build_qwen3_messages(image, None)
+    return processor.apply_chat_template(
+        messages,
+        tokenize=True,
+        add_generation_prompt=True,
+        return_dict=True,
+        return_tensors="pt",
+    )
+
+
+@torch.inference_mode()
+def prob_malignant_from_qwen3_logits(model, processor, image: Image.Image) -> float:
+    tokenizer = processor.tokenizer
+    device = model.device
+    base_inputs = build_qwen3_vl_inputs(processor, image)
+    base_inputs = {k: v.to(device) for k, v in base_inputs.items()}
+
+    candidate_pairs = [(" 0", " 1"), ("0", "1"), ("\n0", "\n1"), (" 0\n", " 1\n")]
+    last_err = None
+    for c0, c1 in candidate_pairs:
+        try:
+            lp0 = score_string_logprob(model, tokenizer, base_inputs, c0)
+            lp1 = score_string_logprob(model, tokenizer, base_inputs, c1)
+            m = max(lp0, lp1)
+            p0 = torch.exp(torch.tensor(lp0 - m)).item()
+            p1 = torch.exp(torch.tensor(lp1 - m)).item()
+            return float(p1 / (p0 + p1 + 1e-12))
+        except Exception as exc:
+            last_err = exc
+    raise RuntimeError(f"All Qwen3 candidate pairs failed. Last error: {last_err}")
+
+
+@torch.inference_mode()
+def prob_malignant_from_medgemma_logits(model, processor, image: Image.Image, prefer_leading_space: bool = True) -> float:
+    tokenizer = processor.tokenizer
+    device = model.device
+    base_inputs = processor(images=image, text=MEDGEMMA_PROMPT, return_tensors="pt")
+    base_inputs = {k: v.to(device) for k, v in base_inputs.items()}
+    c0 = " 0" if prefer_leading_space else "0"
+    c1 = " 1" if prefer_leading_space else "1"
+    lp0 = score_string_logprob(model, tokenizer, base_inputs, c0)
+    lp1 = score_string_logprob(model, tokenizer, base_inputs, c1)
+    m = max(lp0, lp1)
+    p0 = torch.exp(torch.tensor(lp0 - m)).item()
+    p1 = torch.exp(torch.tensor(lp1 - m)).item()
+    return float(p1 / (p0 + p1 + 1e-12))
+
+
+def build_prediction_callback(
+    records,
+    image_dir: str,
+    processor,
+    probability_fn: Callable[[Any, Any, Image.Image], float],
+    threshold: float = 0.5,
+):
+    def callback(model) -> Dict[str, float]:
+        labels: List[int] = []
+        probabilities: List[float] = []
+        for record in records:
+            filename = str(record["filename"])
+            image_path = resolve_image_path(image_dir, filename)
+            if not os.path.exists(image_path):
+                raise FileNotFoundError(f"Missing evaluation image: {image_path}")
+            image = safe_open_image(image_path)
+            try:
+                probability = probability_fn(model, processor, image)
+            finally:
+                image.close()
+            labels.append(int(record["malignancy"]))
+            probabilities.append(float(probability))
+        return summarize_predictions(labels, probabilities, threshold=threshold)
+
+    return callback
 
 
 def save_processor(processor, output_dir: str) -> None:
