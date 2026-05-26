@@ -1,0 +1,14 @@
+==== Qwen3-VL-8B-Instruct Thyroid Binary Classification Metrics (pos=malignant=1) ====
+Model dir:         /mnt/wangbd8/workspace/Qwen3-VL-8B-Instruct
+Evaluated samples: 1000
+Missing files:     0
+Bad images:        0
+AUROC:             0.921435 (95% CI 0.901617-0.940133)
+AUPRC:             0.963642 (95% CI 0.951461-0.974247)
+Acc:               0.886000 (95% CI 0.866000-0.906000)
+F1:                0.923387 (95% CI 0.908713-0.936896)
+Sensitivity:       0.939808 (95% CI 0.922019-0.957068)
+Specificity:       0.739777 (95% CI 0.686345-0.790624)
+Confusion (tn fp fn tp): 199 70 44 687
+Saved per-image predictions to: ft/qwen3_TN5K_ft_preds.csv
+Saved metrics to: ft/qwen3_TN5K_ft_preds.txt

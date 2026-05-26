@@ -1,0 +1,13 @@
+==== MedGemma Thyroid Binary Classification Metrics (pos=malignant=1) ====
+Evaluated samples: 2090
+Missing files:     0
+Bad images:        0
+AUROC:             0.937102 (95% CI 0.927216-0.946659)
+AUPRC:             0.920136 (95% CI 0.904364-0.934091)
+Acc:               0.830144 (95% CI 0.813397-0.845467)
+F1:                0.795389 (95% CI 0.773069-0.815026)
+Sensitivity:       0.711340 (95% CI 0.681906-0.739133)
+Specificity:       0.933036 (95% CI 0.918531-0.946903)
+Confusion (tn fp fn tp): 1045 75 280 690
+Saved per-image predictions to: ft/medgemma_ThyroidXL_ft_preds.csv
+Saved metrics to: ft/medgemma_ThyroidXL_ft_preds.txt
