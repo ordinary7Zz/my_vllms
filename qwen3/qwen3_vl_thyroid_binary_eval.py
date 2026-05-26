@@ -151,19 +151,28 @@ def main():
         seed=args.ci_seed,
     )
 
-    print("\n==== Qwen3-VL-8B-Instruct Thyroid Binary Classification Metrics (pos=malignant=1) ====")
-    print(f"Model dir:         {args.model_dir}")
-    print(f"Evaluated samples: {len(y_true)}")
-    print(f"Missing files:     {missing_files}")
-    print(f"Bad images:        {bad_images}")
-    print(f"AUROC:             {metrics['auroc']:.6f} (95% CI {cis['auroc'][0]:.6f}-{cis['auroc'][1]:.6f})")
-    print(f"AUPRC:             {metrics['auprc']:.6f} (95% CI {cis['auprc'][0]:.6f}-{cis['auprc'][1]:.6f})")
-    print(f"Acc:               {metrics['accuracy']:.6f} (95% CI {cis['accuracy'][0]:.6f}-{cis['accuracy'][1]:.6f})")
-    print(f"F1:                {metrics['f1']:.6f} (95% CI {cis['f1'][0]:.6f}-{cis['f1'][1]:.6f})")
-    print(f"Sensitivity:       {metrics['sensitivity']:.6f} (95% CI {cis['sensitivity'][0]:.6f}-{cis['sensitivity'][1]:.6f})")
-    print(f"Specificity:       {metrics['specificity']:.6f} (95% CI {cis['specificity'][0]:.6f}-{cis['specificity'][1]:.6f})")
-    print(f"Confusion (tn fp fn tp): {metrics['tn']} {metrics['fp']} {metrics['fn']} {metrics['tp']}")
-    print(f"Saved per-image predictions to: {args.out_csv}")
+    out_metrics = os.path.splitext(args.out_csv)[0] + ".txt"
+    summary_lines = [
+        "==== Qwen3-VL-8B-Instruct Thyroid Binary Classification Metrics (pos=malignant=1) ====",
+        f"Model dir:         {args.model_dir}",
+        f"Evaluated samples: {len(y_true)}",
+        f"Missing files:     {missing_files}",
+        f"Bad images:        {bad_images}",
+        f"AUROC:             {metrics['auroc']:.6f} (95% CI {cis['auroc'][0]:.6f}-{cis['auroc'][1]:.6f})",
+        f"AUPRC:             {metrics['auprc']:.6f} (95% CI {cis['auprc'][0]:.6f}-{cis['auprc'][1]:.6f})",
+        f"Acc:               {metrics['accuracy']:.6f} (95% CI {cis['accuracy'][0]:.6f}-{cis['accuracy'][1]:.6f})",
+        f"F1:                {metrics['f1']:.6f} (95% CI {cis['f1'][0]:.6f}-{cis['f1'][1]:.6f})",
+        f"Sensitivity:       {metrics['sensitivity']:.6f} (95% CI {cis['sensitivity'][0]:.6f}-{cis['sensitivity'][1]:.6f})",
+        f"Specificity:       {metrics['specificity']:.6f} (95% CI {cis['specificity'][0]:.6f}-{cis['specificity'][1]:.6f})",
+        f"Confusion (tn fp fn tp): {metrics['tn']} {metrics['fp']} {metrics['fn']} {metrics['tp']}",
+        f"Saved per-image predictions to: {args.out_csv}",
+    ]
+    summary_text = "\n".join(summary_lines)
+
+    print("\n" + summary_text)
+    with open(out_metrics, "w", encoding="utf-8") as f:
+        f.write(summary_text + "\n")
+    print(f"Saved metrics to: {out_metrics}")
 
 
 if __name__ == "__main__":
