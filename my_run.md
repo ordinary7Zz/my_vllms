@@ -120,7 +120,8 @@ python medgemma_thyroid_binary_eval.py \
   --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
   --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/images \
   --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/DDTI_Classification_test_label.json \
-  --out_csv medgemma_DDTI_Classification_all_preds.csv \
+  --out_path . \
+  --filename medgemma_DDTI_Classification_all_preds \
   --dtype bf16 \
   --threshold 0.5 \
   --ci_bootstrap 2000 \
@@ -137,7 +138,8 @@ python qwen3_vl_thyroid_binary_eval.py \
   --model_dir /mnt/wangbd8/workspace/Qwen3-VL-8B-Instruct \
   --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/images \
   --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/DDTI_Classification_test_label.json \
-  --out_csv qwen3_vl_DDTI_Classification_all_preds.csv \
+  --out_path . \
+  --filename qwen3_vl_DDTI_Classification_all_preds \
   --dtype bf16 \
   --threshold 0.5 \
   --ci_bootstrap 2000 \
@@ -195,7 +197,8 @@ python medgemma_thyroid_binary_eval.py \
   --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_dataset_3_lora \
   --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/TN3K/test/images \
   --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/TN3K/test/TN3K_test_label.json \
-  --out_csv ft/medgemma_TN3K_ft_preds.csv \
+  --out_path ft \
+  --filename medgemma_TN3K_ft_preds \
   --dtype bf16
 
 python medgemma_thyroid_binary_eval.py \
@@ -203,7 +206,8 @@ python medgemma_thyroid_binary_eval.py \
   --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_sample_lora \
   --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/images \
   --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/thyroidxl_test_labels_sample.json \
-  --out_csv medgemma_sample_ft_preds.csv \
+  --out_path . \
+  --filename medgemma_sample_ft_preds \
   --dtype bf16
 ```
 
@@ -258,7 +262,8 @@ python qwen3_vl_thyroid_binary_eval.py \
   --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_dataset_3_lora \
   --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/TN3K/test/images \
   --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/TN3K/test/TN3K_test_label.json \
-  --out_csv qwen3_TN3K_ft_preds.csv \
+  --out_path ft \
+  --filename qwen3_TN3K_ft_preds \
   --dtype bf16
 
 python qwen3_vl_thyroid_binary_eval.py \
@@ -266,7 +271,8 @@ python qwen3_vl_thyroid_binary_eval.py \
   --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_sample_lora \
   --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/images \
   --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/thyroidxl_test_labels_sample.json \
-  --out_csv qwen3_sample_ft_preds.csv \
+  --out_path . \
+  --filename qwen3_sample_ft_preds \
   --dtype bf16
 ```
 
@@ -293,7 +299,8 @@ python medgemma_thyroid_binary_eval.py \
   --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
   --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/images \
   --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/DDTI_Classification_test_label.json \
-  --out_csv medgemma_test_preds.csv \
+  --out_path . \
+  --filename medgemma_test_preds \
   --dtype bf16 \
   --limit 10
 ```
@@ -305,7 +312,8 @@ python qwen3_vl_thyroid_binary_eval.py \
   --model_dir /mnt/wangbd8/workspace/Qwen3-VL-8B-Instruct \
   --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/images \
   --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/DDTI_Classification_test_label.json \
-  --out_csv qwen3_test_preds.csv \
+  --out_path . \
+  --filename qwen3_test_preds \
   --dtype bf16 \
   --limit 10
 ```
@@ -322,8 +330,10 @@ python qwen3_vl_thyroid_binary_eval.py \
 - `Specificity`
 - 每个指标对应的 `95% CI`
 - 混淆矩阵 `tn fp fn tp`
+- CSV 预测结果保存路径
+- TXT 指标摘要保存路径
 
-### 2. `out_csv` 会保存每张图的结果
+### 2. `out_path/filename` 会保存每张图的结果
 
 字段包括：
 
@@ -341,7 +351,8 @@ python qwen3_vl_thyroid_binary_eval.py \
 - `--model_dir`：模型本地目录
 - `--image_dir`：图像目录
 - `--label_json`：标签 json 文件
-- `--out_csv`：输出预测结果 CSV
+- `--filename`：输出文件基名，不带扩展名
+- `--out_path`：输出目录，会自动创建；最终会生成 `{out_path}/{filename}.csv` 和 `{out_path}/{filename}.txt`
 - `--dtype`：推理精度，可选 `bf16 / fp16 / fp32`
 - `--threshold`：二分类阈值，默认 `0.5`
 - `--limit`：只跑前 N 个样本，默认 `-1` 表示全部

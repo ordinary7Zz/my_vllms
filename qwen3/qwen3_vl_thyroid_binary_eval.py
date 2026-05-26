@@ -40,8 +40,10 @@ def main():
                     help="Directory containing images referenced by filename in label json")
     ap.add_argument("--label_json", type=str, required=True,
                     help="Label json path, e.g. /mnt/data/tn3k_test_label.json")
-    ap.add_argument("--out_csv", type=str, default="qwen3_vl_8b_preds.csv",
-                    help="Output CSV with per-image predictions")
+    ap.add_argument("--filename", type=str, default="qwen3_vl_8b_preds",
+                    help="Base filename for outputs, without extension")
+    ap.add_argument("--out_path", type=str, default=".",
+                    help="Directory to save evaluation outputs")
     ap.add_argument("--use_fast_processor", action="store_true",
                     help="Use fast processor (default: slow for stability)")
     ap.add_argument("--dtype", type=str, default="bf16", choices=["bf16", "fp16", "fp32"],
@@ -62,6 +64,10 @@ def main():
     ap.add_argument("--use_qlora", action="store_true",
                     help="Load the base model with the same 4-bit QLoRA quantization used during training")
     args = ap.parse_args()
+
+    out_csv = os.path.join(args.out_path, f"{args.filename}.csv")
+    out_metrics = os.path.join(args.out_path, f"{args.filename}.txt")
+    os.makedirs(args.out_path, exist_ok=True)
 
     labels = load_labels(args.label_json)
     if args.limit is not None and args.limit > 0:
@@ -103,11 +109,15 @@ def main():
     print(f"Processor source:  {processor_source}")
     print(f"Use QLoRA:         {args.use_qlora}")
     print(f"Attention impl:    {args.attn_impl}")
+    print(f"Output dir:        {args.out_path}")
+    print(f"Output filename:   {args.filename}")
+    print(f"Predictions CSV:   {out_csv}")
+    print(f"Metrics TXT:       {out_metrics}")
 
     missing_files = 0
     bad_images = 0
 
-    with open(args.out_csv, "w", newline="", encoding="utf-8") as f:
+    with open(out_csv, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["filename", "gt_malignant", "p_malignant", "pred_malignant", "logp_0", "logp_1", "cand0", "cand1"])
 
@@ -151,7 +161,6 @@ def main():
         seed=args.ci_seed,
     )
 
-    out_metrics = os.path.splitext(args.out_csv)[0] + ".txt"
     summary_lines = [
         "==== Qwen3-VL-8B-Instruct Thyroid Binary Classification Metrics (pos=malignant=1) ====",
         f"Model dir:         {args.model_dir}",
@@ -165,7 +174,8 @@ def main():
         f"Sensitivity:       {metrics['sensitivity']:.6f} (95% CI {cis['sensitivity'][0]:.6f}-{cis['sensitivity'][1]:.6f})",
         f"Specificity:       {metrics['specificity']:.6f} (95% CI {cis['specificity'][0]:.6f}-{cis['specificity'][1]:.6f})",
         f"Confusion (tn fp fn tp): {metrics['tn']} {metrics['fp']} {metrics['fn']} {metrics['tp']}",
-        f"Saved per-image predictions to: {args.out_csv}",
+        f"Saved per-image predictions to: {out_csv}",
+        f"Saved metrics to: {out_metrics}",
     ]
     summary_text = "\n".join(summary_lines)
 
