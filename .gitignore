@@ -13,3 +13,7 @@ __pycache__/
 .DS_Store
 *.swp
 *.swo
+
+# LoRA 微调权重
+medgemma/*_lora/
+qwen3/*_lora/

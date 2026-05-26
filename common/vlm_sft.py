@@ -247,7 +247,7 @@ def build_qwen3_vl_inputs(processor, image: Image.Image) -> Dict[str, torch.Tens
 
 
 @torch.inference_mode()
-def prob_malignant_from_qwen3_logits(model, processor, image: Image.Image) -> float:
+def prob_malignant_from_qwen3_logits(model, processor, image: Image.Image, return_debug: bool = False):
     tokenizer = processor.tokenizer
     device = model.device
     base_inputs = build_qwen3_vl_inputs(processor, image)
@@ -262,7 +262,10 @@ def prob_malignant_from_qwen3_logits(model, processor, image: Image.Image) -> fl
             m = max(lp0, lp1)
             p0 = torch.exp(torch.tensor(lp0 - m)).item()
             p1 = torch.exp(torch.tensor(lp1 - m)).item()
-            return float(p1 / (p0 + p1 + 1e-12))
+            probability = float(p1 / (p0 + p1 + 1e-12))
+            if return_debug:
+                return probability, {"logp_0": float(lp0), "logp_1": float(lp1), "cand0": c0, "cand1": c1}
+            return probability
         except Exception as exc:
             last_err = exc
     raise RuntimeError(f"All Qwen3 candidate pairs failed. Last error: {last_err}")

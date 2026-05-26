@@ -197,6 +197,14 @@ python medgemma_thyroid_binary_eval.py \
   --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/test/dataset_3_test_label.json \
   --out_csv medgemma_dataset_3_ft_preds.csv \
   --dtype bf16
+
+python medgemma_thyroid_binary_eval.py \
+  --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
+  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_sample_lora \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/images \
+  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/thyroidxl_test_labels_sample.json \
+  --out_csv medgemma_sample_ft_preds.csv \
+  --dtype bf16
 ```
 
 ### 3. 微调 Qwen3-VL
@@ -206,15 +214,15 @@ cd /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/my_vllms/qwen3
 
 CUDA_VISIBLE_DEVICES=2 python qwen3_vl_thyroid_binary_train.py \
   --model_dir /mnt/wangbd8/workspace/Qwen3-VL-8B-Instruct \
-  --train_image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/TN5K/train/images \
-  --test_image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/TN5K/test/images \
-  --train_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/TN5K/train/TN5K_train_label.json \
-  --test_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/TN5K/test/TN5K_test_label.json \
-  --output_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_TN5K_lora \
+  --train_image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/train/images \
+  --test_image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/test/images \
+  --train_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/train/dataset_3_train_label.json \
+  --test_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/Superimposed_multitask/dataset_3/test/dataset_3_test_label.json \
+  --output_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_dataset_3_lora \
   --dtype bf16 \
   --use_qlora \
   --attn_impl sdpa \
-  --epochs 3 \
+  --epochs 2 \
   --per_device_train_batch_size 1 \
   --per_device_eval_batch_size 1 \
   --gradient_accumulation_steps 8 \
@@ -251,6 +259,14 @@ python qwen3_vl_thyroid_binary_eval.py \
   --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/TN3K/images \
   --label_json /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/my_vllms/my_json/tn3k_test_label.json \
   --out_csv qwen3_tn3k_ft_preds.csv \
+  --dtype bf16
+
+python qwen3_vl_thyroid_binary_eval.py \
+  --model_dir /mnt/wangbd8/workspace/Qwen3-VL-8B-Instruct \
+  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_sample_lora \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/images \
+  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/thyroidxl_test_labels_sample.json \
+  --out_csv qwen3_sample_ft_preds.csv \
   --dtype bf16
 ```
 

@@ -1,9 +1,8 @@
 import os
 import sys
-import json
 import csv
 import argparse
-from typing import List, Dict, Tuple
+from typing import List
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
@@ -11,145 +10,18 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 import torch
-from PIL import Image
 from tqdm import tqdm
-
 from transformers import AutoProcessor, Qwen3VLForConditionalGeneration
+
+from common.thyroid_data import load_labels, safe_open_image
 from common.thyroid_metrics import compute_metrics, bootstrap_metric_cis
-from common.thyroid_prompts import build_qwen3_messages
-from common.vlm_sft import load_peft_adapter_if_needed
+from common.vlm_sft import (
+    load_peft_adapter_if_needed,
+    maybe_build_quant_config,
+    prob_malignant_from_qwen3_logits,
+)
 
 
-# ----------------------------
-# Utils (same as MedGemma script)
-# ----------------------------
-def load_labels(label_json: str) -> List[Dict]:
-    """
-    Expected label format (list of dict):
-      [{"filename": "...", "malignancy": 0/1}, ...]
-    """
-    with open(label_json, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    if not isinstance(data, list):
-        raise ValueError("Label JSON must be a list of records.")
-    for r in data:
-        if "filename" not in r or "malignancy" not in r:
-            raise ValueError("Each record must contain keys: filename, malignancy.")
-        r["malignancy"] = int(r["malignancy"])
-        if r["malignancy"] not in (0, 1):
-            raise ValueError(f"malignancy must be 0/1, got {r['malignancy']}")
-    return data
-
-
-def safe_open_image(path: str) -> Image.Image:
-    img = Image.open(path)
-    # ultrasound images might be grayscale; convert to RGB to be safe
-    return img.convert("RGB")
-
-
-@torch.inference_mode()
-def score_string_logprob(
-    model: Qwen3VLForConditionalGeneration,
-    tokenizer,
-    base_inputs: Dict[str, torch.Tensor],
-    target_text: str,
-) -> float:
-    """
-    Compute log P(target_text | base_inputs) using cached KV for efficiency.
-
-    Steps:
-      1) Forward pass on base inputs -> get logits for next token + past_key_values
-      2) For each token in target tokens:
-          add logprob of token given current logits
-          feed token with past_key_values to get next logits
-    """
-    tgt_ids = tokenizer.encode(target_text, add_special_tokens=False)
-    if len(tgt_ids) == 0:
-        raise ValueError(f"target_text tokenized to empty sequence: {repr(target_text)}")
-
-    out = model(**base_inputs, use_cache=True)
-    logits = out.logits
-    past = out.past_key_values
-
-    next_logits = logits[:, -1, :]  # [1, V]
-    logprob = 0.0
-
-    for tid in tgt_ids:
-        step_logprob = torch.log_softmax(next_logits, dim=-1)[0, tid].item()
-        logprob += step_logprob
-
-        input_ids = torch.tensor([[tid]], device=next_logits.device, dtype=torch.long)
-        out2 = model(input_ids=input_ids, past_key_values=past, use_cache=True)
-        next_logits = out2.logits[:, -1, :]
-        past = out2.past_key_values
-
-    return float(logprob)
-
-
-def build_qwen3_vl_inputs(processor: AutoProcessor, img: Image.Image) -> Dict[str, torch.Tensor]:
-    """
-    Build Qwen3-VL multimodal chat inputs. We force output to be exactly one character: 0 or 1.
-    """
-    messages = build_qwen3_messages(img, None)
-
-    inputs = processor.apply_chat_template(
-        messages,
-        tokenize=True,
-        add_generation_prompt=True,
-        return_dict=True,
-        return_tensors="pt",
-    )
-    return inputs
-
-
-def prob_malignant_from_logits(
-    model: Qwen3VLForConditionalGeneration,
-    processor: AutoProcessor,
-    img: Image.Image,
-) -> Tuple[float, Dict[str, float]]:
-    """
-    Return P(malignant=1) by comparing log-probabilities of "0" vs "1" candidates.
-
-    Because tokenization can differ (leading space/newline), we try a few safe candidate forms.
-    For each pair (c0, c1), compute:
-        p1 = exp(lp1) / (exp(lp0) + exp(lp1))
-    Use the first pair that works.
-    """
-    tokenizer = processor.tokenizer
-    device = model.device
-
-    base_inputs = build_qwen3_vl_inputs(processor, img)
-    base_inputs = {k: v.to(device) for k, v in base_inputs.items()}
-
-    candidate_pairs = [
-        (" 0", " 1"),
-        ("0", "1"),
-        ("\n0", "\n1"),
-        (" 0\n", " 1\n"),
-    ]
-
-    last_err = None
-    for c0, c1 in candidate_pairs:
-        try:
-            lp0 = score_string_logprob(model, tokenizer, base_inputs, c0)
-            lp1 = score_string_logprob(model, tokenizer, base_inputs, c1)
-
-            m = max(lp0, lp1)
-            p0 = torch.exp(torch.tensor(lp0 - m)).item()
-            p1 = torch.exp(torch.tensor(lp1 - m)).item()
-            p1_norm = p1 / (p0 + p1 + 1e-12)
-
-            return float(p1_norm), {"logp_0": lp0, "logp_1": lp1, "cand0": c0, "cand1": c1}
-        except Exception as e:
-            last_err = e
-            continue
-
-    raise RuntimeError(f"All candidate pairs failed. Last error: {last_err}")
-
-
-# ----------------------------
-# Main
-# ----------------------------
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument(
@@ -187,13 +59,14 @@ def main():
     ap.add_argument("--attn_impl", type=str, default="auto",
                     choices=["auto", "flash_attention_2", "sdpa", "eager"],
                     help="Attention implementation; use flash_attention_2 if installed")
+    ap.add_argument("--use_qlora", action="store_true",
+                    help="Load the base model with the same 4-bit QLoRA quantization used during training")
     args = ap.parse_args()
 
     labels = load_labels(args.label_json)
     if args.limit is not None and args.limit > 0:
         labels = labels[: args.limit]
 
-    # dtype
     if args.dtype == "bf16":
         torch_dtype = torch.bfloat16
     elif args.dtype == "fp16":
@@ -201,17 +74,19 @@ def main():
     else:
         torch_dtype = torch.float32
 
-    # load processor/model
     if args.adapter_dir and os.path.exists(os.path.join(args.adapter_dir, "preprocessor_config.json")):
         processor_source = args.adapter_dir
     else:
         processor_source = args.model_dir
     processor = AutoProcessor.from_pretrained(processor_source, use_fast=args.use_fast_processor)
 
-    model_kwargs = dict(
-        device_map="cuda",
-        torch_dtype=torch_dtype,
-    )
+    model_kwargs = {
+        "device_map": "auto",
+        "torch_dtype": torch_dtype,
+    }
+    quantization_config = maybe_build_quant_config(args.use_qlora)
+    if quantization_config is not None:
+        model_kwargs["quantization_config"] = quantization_config
     if args.attn_impl != "auto":
         model_kwargs["attn_implementation"] = args.attn_impl
 
@@ -226,6 +101,8 @@ def main():
     print(f"Model dir:         {args.model_dir}")
     print(f"Adapter dir:       {args.adapter_dir or 'none'}")
     print(f"Processor source:  {processor_source}")
+    print(f"Use QLoRA:         {args.use_qlora}")
+    print(f"Attention impl:    {args.attn_impl}")
 
     missing_files = 0
     bad_images = 0
@@ -249,7 +126,10 @@ def main():
                 bad_images += 1
                 continue
 
-            p1, dbg = prob_malignant_from_logits(model=model, processor=processor, img=img)
+            try:
+                p1, dbg = prob_malignant_from_qwen3_logits(model=model, processor=processor, image=img, return_debug=True)
+            finally:
+                img.close()
             pred = 1 if p1 >= args.threshold else 0
 
             y_true.append(gt)
@@ -288,4 +168,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
