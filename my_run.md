@@ -129,7 +129,27 @@ python medgemma_thyroid_binary_eval.py \
   --ci_seed 42
 ```
 
-### 3. 运行 Qwen3-VL
+### 3. 运行 MedGemma JSON 版
+
+用于输出可被 `plot_single_task_auroc.py` 直接读取的样本级 JSON：
+
+```bash
+cd /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/my_vllms/medgemma
+
+python medgemma_thyroid_binary_eval_json.py \
+  --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/images \
+  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/DDTI_Classification_test_label.json \
+  --out_path . \
+  --filename medgemma_DDTI_Classification_all_preds_json \
+  --dtype bf16 \
+  --threshold 0.5 \
+  --ci_bootstrap 2000 \
+  --ci_alpha 0.95 \
+  --ci_seed 42
+```
+
+### 4. 运行 Qwen3-VL
 
 ```bash
 cd /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/my_vllms/qwen3
@@ -140,6 +160,26 @@ python qwen3_vl_thyroid_binary_eval.py \
   --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/DDTI_Classification_test_label.json \
   --out_path . \
   --filename qwen3_vl_DDTI_Classification_all_preds \
+  --dtype bf16 \
+  --threshold 0.5 \
+  --ci_bootstrap 2000 \
+  --ci_alpha 0.95 \
+  --ci_seed 42
+```
+
+### 5. 运行 Qwen3-VL JSON 版
+
+用于输出可被 `plot_single_task_auroc.py` 直接读取的样本级 JSON：
+
+```bash
+cd /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/my_vllms/qwen3
+
+python qwen3_vl_thyroid_binary_eval_json.py \
+  --model_dir /mnt/wangbd8/workspace/Qwen3-VL-8B-Instruct \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/images \
+  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/DDTI_Classification_test_label.json \
+  --out_path . \
+  --filename qwen3_vl_DDTI_Classification_all_preds_json \
   --dtype bf16 \
   --threshold 0.5 \
   --ci_bootstrap 2000 \
@@ -192,13 +232,13 @@ CUDA_VISIBLE_DEVICES=1 python medgemma_thyroid_binary_train.py \
 ### 2. 评估微调后的 MedGemma
 
 ```bash
-python medgemma_thyroid_binary_eval.py \
+CUDA_VISIBLE_DEVICES=2 python medgemma_thyroid_binary_eval.py \
   --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
   --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_dataset_3_lora \
-  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/TN3K/test/images \
-  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/TN3K/test/TN3K_test_label.json \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/images_processed \
+  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/DDTI_Classification_test_label.json \
   --out_path ft \
-  --filename medgemma_TN3K_ft_preds \
+  --filename medgemma_DDTI_ft_preds \
   --dtype bf16
 
 python medgemma_thyroid_binary_eval.py \
@@ -257,13 +297,13 @@ CUDA_VISIBLE_DEVICES=2 python qwen3_vl_thyroid_binary_train.py \
 ### 4. 评估微调后的 Qwen3-VL
 
 ```bash
-python qwen3_vl_thyroid_binary_eval.py \
+CUDA_VISIBLE_DEVICES=2 python qwen3_vl_thyroid_binary_eval.py \
   --model_dir /mnt/wangbd8/workspace/Qwen3-VL-8B-Instruct \
   --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_dataset_3_lora \
-  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/TN3K/test/images \
-  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/TN3K/test/TN3K_test_label.json \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/images_processed \
+  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/DDTI_Classification_test_label.json \
   --out_path ft \
-  --filename qwen3_TN3K_ft_preds \
+  --filename qwen3_DDTI_ft_preds \
   --dtype bf16
 
 python qwen3_vl_thyroid_binary_eval.py \
@@ -305,7 +345,20 @@ python medgemma_thyroid_binary_eval.py \
   --limit 10
 ```
 
-### 3. Qwen3-VL
+### 3. MedGemma JSON 版
+
+```bash
+python medgemma_thyroid_binary_eval_json.py \
+  --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/images \
+  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/DDTI_Classification_test_label.json \
+  --out_path . \
+  --filename medgemma_test_preds_json \
+  --dtype bf16 \
+  --limit 10
+```
+
+### 4. Qwen3-VL
 
 ```bash
 python qwen3_vl_thyroid_binary_eval.py \
@@ -314,6 +367,19 @@ python qwen3_vl_thyroid_binary_eval.py \
   --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/DDTI_Classification_test_label.json \
   --out_path . \
   --filename qwen3_test_preds \
+  --dtype bf16 \
+  --limit 10
+```
+
+### 5. Qwen3-VL JSON 版
+
+```bash
+python qwen3_vl_thyroid_binary_eval_json.py \
+  --model_dir /mnt/wangbd8/workspace/Qwen3-VL-8B-Instruct \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/images \
+  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/DDTI_Classification_test_label.json \
+  --out_path . \
+  --filename qwen3_test_preds_json \
   --dtype bf16 \
   --limit 10
 ```
@@ -330,10 +396,10 @@ python qwen3_vl_thyroid_binary_eval.py \
 - `Specificity`
 - 每个指标对应的 `95% CI`
 - 混淆矩阵 `tn fp fn tp`
-- CSV 预测结果保存路径
+- 预测结果保存路径
 - TXT 指标摘要保存路径
 
-### 2. `out_path/filename` 会保存每张图的结果
+### 2. CSV 版 `out_path/filename` 会保存每张图的结果
 
 字段包括：
 
@@ -341,6 +407,28 @@ python qwen3_vl_thyroid_binary_eval.py \
 - `gt_malignant`
 - `p_malignant`
 - `pred_malignant`
+- `logp_0`
+- `logp_1`
+- `cand0`
+- `cand1`
+
+### 3. JSON 版 `out_path/filename` 会保存可直接用于 AUROC 绘图的样本级结果
+
+每条记录至少包含：
+
+- `record_type`
+- `true_label`
+- `prob_class_1`
+
+当前 JSON 脚本还会额外输出：
+
+- `prob_class_0`
+- `predicted_class`
+- `confidence`
+- `image_file`
+- `image_name`
+- `filename`
+- `selected_model`
 - `logp_0`
 - `logp_1`
 - `cand0`
