@@ -40,6 +40,8 @@ def main():
                     help="Directory containing images referenced by filename in label json")
     ap.add_argument("--label_json", type=str, required=True,
                     help="Label json path, e.g. /mnt/data/tn3k_test_label.json")
+    ap.add_argument("--label_key", type=str, default="malignancy",
+                    help="Label field name in label json, default: malignancy")
     ap.add_argument("--filename", type=str, default="qwen3_vl_8b_preds",
                     help="Base filename for outputs, without extension")
     ap.add_argument("--out_path", type=str, default=".",
@@ -69,7 +71,7 @@ def main():
     out_metrics = os.path.join(args.out_path, f"{args.filename}.txt")
     os.makedirs(args.out_path, exist_ok=True)
 
-    labels = load_labels(args.label_json)
+    labels = load_labels(args.label_json, label_key=args.label_key)
     if args.limit is not None and args.limit > 0:
         labels = labels[: args.limit]
 

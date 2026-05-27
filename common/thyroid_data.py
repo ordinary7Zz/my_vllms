@@ -10,7 +10,7 @@ from torch.utils.data import Dataset
 Record = Dict[str, Union[int, str]]
 
 
-def load_labels(label_json: str) -> List[Record]:
+def load_labels(label_json: str, label_key: str = "malignancy") -> List[Record]:
     with open(label_json, "r", encoding="utf-8") as f:
         data = json.load(f)
     if not isinstance(data, list):
@@ -19,12 +19,12 @@ def load_labels(label_json: str) -> List[Record]:
     for r in data:
         if not isinstance(r, dict):
             raise ValueError("Each record must be a dict.")
-        if "filename" not in r or "malignancy" not in r:
-            raise ValueError("Each record must contain keys: filename, malignancy.")
+        if "filename" not in r or label_key not in r:
+            raise ValueError(f"Each record must contain keys: filename, {label_key}.")
         filename = str(r["filename"])
-        malignancy = int(r["malignancy"])
+        malignancy = int(r[label_key])
         if malignancy not in (0, 1):
-            raise ValueError(f"malignancy must be 0/1, got {malignancy}")
+            raise ValueError(f"{label_key} must be 0/1, got {malignancy}")
         records.append({"filename": filename, "malignancy": malignancy})
     return records
 

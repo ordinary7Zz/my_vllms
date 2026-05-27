@@ -211,22 +211,6 @@ CUDA_VISIBLE_DEVICES=1 python medgemma_thyroid_binary_train.py \
   --num_workers 4 \
   --learning_rate 2e-4 \
   --load_best_model_at_end
-
-CUDA_VISIBLE_DEVICES=1 python medgemma_thyroid_binary_train.py \
-  --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
-  --train_image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/images \
-  --test_image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/images \
-  --train_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/thyroidxl_train_labels_sample.json \
-  --test_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/thyroidxl_test_labels_sample.json \
-  --output_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_sample_lora \
-  --dtype bf16 \
-  --epochs 2 \
-  --per_device_train_batch_size 1 \
-  --per_device_eval_batch_size 1 \
-  --gradient_accumulation_steps 8 \
-  --num_workers 4 \
-  --learning_rate 2e-4 \
-  --load_best_model_at_end
 ```
 
 ### 2. 评估微调后的 MedGemma
@@ -244,28 +228,11 @@ CUDA_VISIBLE_DEVICES=2 python medgemma_thyroid_binary_eval.py \
 CUDA_VISIBLE_DEVICES=2 python medgemma_thyroid_binary_eval_json.py \
   --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
   --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_dataset_3_lora \
-  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/images_processed \
-  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/DDTI_Classification_test_label.json \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/500_TestData_Malignancy_Cls/images \
+  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/500_TestData_Malignancy_Cls/500_TestData_Malignancy_Cls.json \
+  --label_key malignancy \
   --out_path ft \
-  --filename medgemma_DDTI_ft_preds_json \
-  --dtype bf16
-
-python medgemma_thyroid_binary_eval.py \
-  --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
-  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_sample_lora \
-  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/images \
-  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/thyroidxl_test_labels_sample.json \
-  --out_path . \
-  --filename medgemma_sample_ft_preds \
-  --dtype bf16
-
-python medgemma_thyroid_binary_eval_json.py \
-  --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
-  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_sample_lora \
-  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/images \
-  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/thyroidxl_test_labels_sample.json \
-  --out_path . \
-  --filename medgemma_sample_ft_preds_json \
+  --filename medgemma_500BM_ft_preds_json \
   --dtype bf16
 ```
 
@@ -291,25 +258,6 @@ CUDA_VISIBLE_DEVICES=2 python qwen3_vl_thyroid_binary_train.py \
   --num_workers 4 \
   --learning_rate 2e-4 \
   --load_best_model_at_end
-
-
-CUDA_VISIBLE_DEVICES=2 python qwen3_vl_thyroid_binary_train.py \
-  --model_dir /mnt/wangbd8/workspace/Qwen3-VL-8B-Instruct \
-  --train_image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/images \
-  --test_image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/images \
-  --train_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/thyroidxl_train_labels_sample.json \
-  --test_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/thyroidxl_test_labels_sample.json \
-  --output_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_sample_lora \
-  --dtype bf16 \
-  --use_qlora \
-  --attn_impl sdpa \
-  --epochs 3 \
-  --per_device_train_batch_size 1 \
-  --per_device_eval_batch_size 1 \
-  --gradient_accumulation_steps 8 \
-  --num_workers 4 \
-  --learning_rate 2e-4 \
-  --load_best_model_at_end
 ```
 
 ### 4. 评估微调后的 Qwen3-VL
@@ -327,28 +275,31 @@ CUDA_VISIBLE_DEVICES=2 python qwen3_vl_thyroid_binary_eval.py \
 CUDA_VISIBLE_DEVICES=2 python qwen3_vl_thyroid_binary_eval_json.py \
   --model_dir /mnt/wangbd8/workspace/Qwen3-VL-8B-Instruct \
   --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_dataset_3_lora \
-  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/images_processed \
-  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/DDTI_Classification_test_label.json \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/500_TestData_Malignancy_Cls/images \
+  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/500_TestData_Malignancy_Cls/500_TestData_Malignancy_Cls.json \
+  --label_key malignancy \
   --out_path ft \
-  --filename qwen3_DDTI_ft_preds_json \
+  --filename qwen3_500BM_ft_preds_json \
   --dtype bf16
 
-python qwen3_vl_thyroid_binary_eval.py \
+CUDA_VISIBLE_DEVICES=2 python qwen3_vl_thyroid_binary_eval_json.py \
   --model_dir /mnt/wangbd8/workspace/Qwen3-VL-8B-Instruct \
-  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_sample_lora \
-  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/images \
-  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/thyroidxl_test_labels_sample.json \
-  --out_path . \
-  --filename qwen3_sample_ft_preds \
+  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_dataset_3_lora \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Lymph_Node_Metastasis_fake/images \
+  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Lymph_Node_Metastasis_fake/LymphUs_test_labels.json \
+  --label_key LNM_CN01 \
+  --out_path ft \
+  --filename qwen3_LNMCN01_ft_preds_json \
   --dtype bf16
 
-python qwen3_vl_thyroid_binary_eval_json.py \
+CUDA_VISIBLE_DEVICES=2 python qwen3_vl_thyroid_binary_eval_json.py \
   --model_dir /mnt/wangbd8/workspace/Qwen3-VL-8B-Instruct \
-  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_sample_lora \
-  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/images \
-  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/thyroidxl_test_labels_sample.json \
-  --out_path . \
-  --filename qwen3_sample_ft_preds_json \
+  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_dataset_3_lora \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Malignant_ultrasound_images_cropped \
+  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Malignant_ultrasound_images_cropped/test_labels_filtered_by_csv.json \
+  --label_key FTCPTC \
+  --out_path ft \
+  --filename qwen3_FTCPTC_ft_preds_json \
   --dtype bf16
 ```
 

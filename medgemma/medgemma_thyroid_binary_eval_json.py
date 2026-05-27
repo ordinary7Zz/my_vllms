@@ -19,18 +19,20 @@ from common.thyroid_prompts import MEDGEMMA_PROMPT
 from common.vlm_sft import load_peft_adapter_if_needed
 
 
-def load_labels(label_json: str) -> List[Dict]:
+def load_labels(label_json: str, label_key: str = "malignancy") -> List[Dict]:
     with open(label_json, "r", encoding="utf-8") as f:
         data = json.load(f)
     if not isinstance(data, list):
         raise ValueError("Label JSON must be a list of records.")
+    normalized = []
     for r in data:
-        if "filename" not in r or "malignancy" not in r:
-            raise ValueError("Each record must contain keys: filename, malignancy.")
-        r["malignancy"] = int(r["malignancy"])
-        if r["malignancy"] not in (0, 1):
-            raise ValueError(f"malignancy must be 0/1, got {r['malignancy']}")
-    return data
+        if "filename" not in r or label_key not in r:
+            raise ValueError(f"Each record must contain keys: filename, {label_key}.")
+        malignancy = int(r[label_key])
+        if malignancy not in (0, 1):
+            raise ValueError(f"{label_key} must be 0/1, got {malignancy}")
+        normalized.append({"filename": str(r["filename"]), "malignancy": malignancy})
+    return normalized
 
 
 def safe_open_image(path: str) -> Image.Image:
@@ -105,6 +107,8 @@ def main():
                     help="Directory containing images referenced by filename in label json")
     ap.add_argument("--label_json", type=str, required=True,
                     help="Label json path, e.g. /mnt/data/tn3k_test_label.json")
+    ap.add_argument("--label_key", type=str, default="malignancy",
+                    help="Label field name in label json, default: malignancy")
     ap.add_argument("--filename", type=str, default="medgemma_preds",
                     help="Base filename for outputs, without extension")
     ap.add_argument("--out_path", type=str, default=".",
@@ -129,7 +133,7 @@ def main():
     out_metrics = os.path.join(args.out_path, f"{args.filename}.txt")
     os.makedirs(args.out_path, exist_ok=True)
 
-    labels = load_labels(args.label_json)
+    labels = load_labels(args.label_json, label_key=args.label_key)
 
     if args.limit is not None and args.limit > 0:
         labels = labels[: args.limit]
