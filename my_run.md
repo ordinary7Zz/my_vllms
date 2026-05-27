@@ -241,6 +241,15 @@ CUDA_VISIBLE_DEVICES=2 python medgemma_thyroid_binary_eval.py \
   --filename medgemma_DDTI_ft_preds \
   --dtype bf16
 
+CUDA_VISIBLE_DEVICES=2 python medgemma_thyroid_binary_eval_json.py \
+  --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
+  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_dataset_3_lora \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/images_processed \
+  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/DDTI_Classification_test_label.json \
+  --out_path ft \
+  --filename medgemma_DDTI_ft_preds_json \
+  --dtype bf16
+
 python medgemma_thyroid_binary_eval.py \
   --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
   --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_sample_lora \
@@ -248,6 +257,15 @@ python medgemma_thyroid_binary_eval.py \
   --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/thyroidxl_test_labels_sample.json \
   --out_path . \
   --filename medgemma_sample_ft_preds \
+  --dtype bf16
+
+python medgemma_thyroid_binary_eval_json.py \
+  --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
+  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_sample_lora \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/images \
+  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/thyroidxl_test_labels_sample.json \
+  --out_path . \
+  --filename medgemma_sample_ft_preds_json \
   --dtype bf16
 ```
 
@@ -306,6 +324,15 @@ CUDA_VISIBLE_DEVICES=2 python qwen3_vl_thyroid_binary_eval.py \
   --filename qwen3_DDTI_ft_preds \
   --dtype bf16
 
+CUDA_VISIBLE_DEVICES=2 python qwen3_vl_thyroid_binary_eval_json.py \
+  --model_dir /mnt/wangbd8/workspace/Qwen3-VL-8B-Instruct \
+  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_dataset_3_lora \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/images_processed \
+  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/DDTI_Classification_test_label.json \
+  --out_path ft \
+  --filename qwen3_DDTI_ft_preds_json \
+  --dtype bf16
+
 python qwen3_vl_thyroid_binary_eval.py \
   --model_dir /mnt/wangbd8/workspace/Qwen3-VL-8B-Instruct \
   --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_sample_lora \
@@ -313,6 +340,15 @@ python qwen3_vl_thyroid_binary_eval.py \
   --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/thyroidxl_test_labels_sample.json \
   --out_path . \
   --filename qwen3_sample_ft_preds \
+  --dtype bf16
+
+python qwen3_vl_thyroid_binary_eval_json.py \
+  --model_dir /mnt/wangbd8/workspace/Qwen3-VL-8B-Instruct \
+  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_sample_lora \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/images \
+  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/ThyroidXL/sample/thyroidxl_test_labels_sample.json \
+  --out_path . \
+  --filename qwen3_sample_ft_preds_json \
   --dtype bf16
 ```
 
@@ -348,6 +384,15 @@ python medgemma_thyroid_binary_eval.py \
 ### 3. MedGemma JSON 版
 
 ```bash
+CUDA_VISIBLE_DEVICES=2 python medgemma_thyroid_binary_eval.py \
+  --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
+  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_dataset_3_lora \
+  --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/images_processed \
+  --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/DDTI_Classification_test_label.json \
+  --out_path ft \
+  --filename medgemma_DDTI_ft_preds \
+  --dtype bf16
+
 python medgemma_thyroid_binary_eval_json.py \
   --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
   --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/DDTI_Classification/all/images \
