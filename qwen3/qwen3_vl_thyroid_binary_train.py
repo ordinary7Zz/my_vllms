@@ -30,6 +30,7 @@ def parse_args():
     ap.add_argument("--test_image_dir", type=str, required=True)
     ap.add_argument("--train_json", type=str, required=True)
     ap.add_argument("--test_json", type=str, required=True)
+    ap.add_argument("--label_key", type=str, default="malignancy")
     ap.add_argument("--output_dir", type=str, required=True)
     ap.add_argument("--epochs", type=float, default=3)
     ap.add_argument("--per_device_train_batch_size", type=int, default=1)
@@ -60,8 +61,8 @@ def parse_args():
 def main():
     args = parse_args()
     processor = AutoProcessor.from_pretrained(args.model_dir, use_fast=False)
-    train_records = load_labels(args.train_json)
-    test_records = load_labels(args.test_json)
+    train_records = load_labels(args.train_json, label_key=args.label_key)
+    test_records = load_labels(args.test_json, label_key=args.label_key)
     train_dataset, test_dataset = build_dataset_pair(
         train_records,
         test_records,
