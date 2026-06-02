@@ -15,7 +15,6 @@ Environment:
 
 import os
 import json
-import csv
 import argparse
 import base64
 import time
@@ -66,8 +65,8 @@ def load_labels(label_json: str) -> List[Dict]:
 
 def safe_open_image(path: str) -> Image.Image:
     """Safely open and convert image to RGB."""
-    img = Image.open(path)
-    return img.convert("RGB")
+    with Image.open(path) as img:
+        return img.convert("RGB")
 
 
 def image_to_base64(image_path: str) -> str:
@@ -313,10 +312,10 @@ def main():
         help="Label json path, e.g. /path/to/test_label.json",
     )
     ap.add_argument(
-        "--out_csv",
+        "--out_json",
         type=str,
-        default="gpt_thyroid_preds.csv",
-        help="Output CSV with per-image predictions",
+        default="gpt_thyroid_preds.json",
+        help="Output JSON with per-sample predictions",
     )
     ap.add_argument(
         "--model",
@@ -393,25 +392,13 @@ def main():
     y_true: List[int] = []
     y_prob: List[float] = []
     y_pred: List[int] = []
+    results: List[Dict[str, object]] = []
 
     missing_files = 0
     bad_images = 0
     api_errors = 0
 
-    with open(args.out_csv, "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(
-            [
-                "filename",
-                "gt_malignant",
-                "p_malignant",
-                "pred_malignant",
-                "parsed_prediction",
-                "reasoning",
-            ]
-        )
-
-        for r in tqdm(labels, desc="Infer"):
+    for r in tqdm(labels, desc="Infer"):
             fn = r["filename"]
             gt = int(r["malignancy"])
 
@@ -444,20 +431,27 @@ def main():
                 dbg = {"reasoning": f"API error: {str(e)}", "parsed_prediction": -1}
 
             pred = 1 if p1 >= args.threshold else 0
+            p0 = 1.0 - p1
 
             y_true.append(gt)
             y_prob.append(p1)
             y_pred.append(pred)
-
-            w.writerow(
-                [
-                    fn,
-                    gt,
-                    f"{p1:.6f}",
-                    pred,
-                    dbg.get("parsed_prediction", -1),
-                    dbg.get("reasoning", ""),
-                ]
+            results.append(
+                {
+                    "record_type": "sample",
+                    "image_file": img_path,
+                    "image_name": fn,
+                    "filename": fn,
+                    "selected_model": args.model,
+                    "predicted_class": pred,
+                    "confidence": float(max(p0, p1)),
+                    "prob_class_0": float(p0),
+                    "prob_class_1": float(p1),
+                    "true_label": gt,
+                    "parsed_prediction": dbg.get("parsed_prediction", -1),
+                    "parsed_confidence": dbg.get("parsed_confidence", p1),
+                    "reasoning": dbg.get("reasoning", ""),
+                }
             )
 
     if len(y_true) == 0:
@@ -505,7 +499,10 @@ def main():
     )
     print(f"Confusion (tn fp fn tp): {metrics['tn']} {metrics['fp']} {metrics['fn']} {metrics['tp']}")
     print("-" * 80)
-    print(f"Saved per-image predictions to: {args.out_csv}")
+    with open(args.out_json, "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
+
+    print(f"Saved per-sample predictions to: {args.out_json}")
 
 
 if __name__ == "__main__":

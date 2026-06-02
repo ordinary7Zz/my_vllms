@@ -7,7 +7,7 @@
 MODEL="gpt-4o"  # Choose: gpt-4-vision-preview, gpt-4o, gpt-4o-mini
 IMAGE_DIR="/path/to/image/directory"
 LABEL_JSON="/path/to/label.json"
-OUTPUT_CSV="./gpt_thyroid_preds.csv"
+OUTPUT_JSON="./gpt_thyroid_preds.json"
 THRESHOLD=0.5
 BOOTSTRAP_SAMPLES=2000
 
@@ -26,7 +26,7 @@ fi
 python gpt_thyroid_binary_eval.py \
     --image_dir "$IMAGE_DIR" \
     --label_json "$LABEL_JSON" \
-    --out_csv "$OUTPUT_CSV" \
+    --out_json "$OUTPUT_JSON" \
     --model "$MODEL" \
     --threshold "$THRESHOLD" \
     --ci_bootstrap "$BOOTSTRAP_SAMPLES" \
@@ -38,6 +38,6 @@ python gpt_thyroid_binary_eval.py \
 # python gpt_thyroid_binary_eval.py \
 #     --image_dir "$IMAGE_DIR" \
 #     --label_json "$LABEL_JSON" \
-#     --out_csv "$OUTPUT_CSV" \
+#     --out_json "$OUTPUT_JSON" \
 #     --model "$MODEL" \
 #     --limit 10

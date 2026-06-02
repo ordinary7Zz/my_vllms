@@ -123,7 +123,7 @@ def show_quick_start():
    python gpt/gpt_thyroid_binary_eval.py \\
        --image_dir /path/to/images \\
        --label_json /path/to/labels.json \\
-       --out_csv results.csv
+       --out_json results.json
 
 
 2. 测试运行（仅处理5个样本）：
@@ -131,7 +131,7 @@ def show_quick_start():
    python gpt/gpt_thyroid_binary_eval.py \\
        --image_dir /path/to/images \\
        --label_json /path/to/labels.json \\
-       --out_csv test_results.csv \\
+       --out_json test_results.json \\
        --limit 5
 
 
@@ -142,14 +142,14 @@ def show_quick_start():
        --image_dir /path/to/images \\
        --label_json /path/to/labels.json \\
        --model gpt-4o-mini \\
-       --out_csv results.csv
+       --out_json results.json
 
    # 使用最强的模型
    python gpt/gpt_thyroid_binary_eval.py \\
        --image_dir /path/to/images \\
        --label_json /path/to/labels.json \\
        --model gpt-4-vision-preview \\
-       --out_csv results.csv
+       --out_json results.json
 
 
 4. 调整分类阈值：
@@ -158,7 +158,7 @@ def show_quick_start():
        --image_dir /path/to/images \\
        --label_json /path/to/labels.json \\
        --threshold 0.7 \\
-       --out_csv results.csv
+       --out_json results.json
 
 
 5. 多模型对比（已有多个模型的预测结果）：
@@ -173,7 +173,7 @@ def show_quick_start():
        --label_json /path/to/labels.json \\
        --ci_bootstrap 5000 \\
        --ci_alpha 0.99 \\
-       --out_csv results.csv
+       --out_json results.json
     """)
 
 

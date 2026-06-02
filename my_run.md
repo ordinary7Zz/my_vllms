@@ -272,7 +272,7 @@ CUDA_VISIBLE_DEVICES=2 python medgemma_thyroid_binary_eval_json.py \
 
 CUDA_VISIBLE_DEVICES=2 python medgemma_thyroid_binary_eval_json.py \
   --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
-  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_dataset_3_lora \
+  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_LNMCN01_lora \
   --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Lymph_Node_Metastasis_fake/images \
   --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Lymph_Node_Metastasis_fake/LymphUs_test_labels.json \
   --label_key LNM_CN01 \
@@ -282,7 +282,7 @@ CUDA_VISIBLE_DEVICES=2 python medgemma_thyroid_binary_eval_json.py \
 
 CUDA_VISIBLE_DEVICES=2 python medgemma_thyroid_binary_eval_json.py \
   --model_dir /mnt/wangbd8/workspace/medgemma-4b-it \
-  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_dataset_3_lora \
+  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/medgemma_FTCPTC_lora \
   --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Malignant_ultrasound_images_cropped \
   --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Malignant_ultrasound_images_cropped/test_labels_filtered_by_csv.json \
   --label_key FTCPTC \
@@ -378,7 +378,7 @@ CUDA_VISIBLE_DEVICES=2 python qwen3_vl_thyroid_binary_eval_json.py \
 
 CUDA_VISIBLE_DEVICES=2 python qwen3_vl_thyroid_binary_eval_json.py \
   --model_dir /mnt/wangbd8/workspace/Qwen3-VL-8B-Instruct \
-  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_dataset_3_lora \
+  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_LNMCN01_lora \
   --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Lymph_Node_Metastasis_fake/images \
   --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Lymph_Node_Metastasis_fake/LymphUs_test_labels.json \
   --label_key LNM_CN01 \
@@ -386,9 +386,9 @@ CUDA_VISIBLE_DEVICES=2 python qwen3_vl_thyroid_binary_eval_json.py \
   --filename qwen3_LNMCN01_ft_preds_json \
   --dtype bf16
 
-CUDA_VISIBLE_DEVICES=2 python qwen3_vl_thyroid_binary_eval_json.py \
+CUDA_VISIBLE_DEVICES=1 python qwen3_vl_thyroid_binary_eval_json.py \
   --model_dir /mnt/wangbd8/workspace/Qwen3-VL-8B-Instruct \
-  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_dataset_3_lora \
+  --adapter_dir /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/qwen3_FTCPTC_lora \
   --image_dir /mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Malignant_ultrasound_images_cropped \
   --label_json /mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Malignant_ultrasound_images_cropped/test_labels_filtered_by_csv.json \
   --label_key FTCPTC \

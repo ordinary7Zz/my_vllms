@@ -10,7 +10,7 @@
 - ✅ 完整的分类指标计算（AUROC、AUPRC、Accuracy、F1、Sensitivity、Specificity）
 - ✅ **Bootstrap置信区间**（95% CI）用于所有指标
 - ✅ 指数退避重试机制处理速率限制
-- ✅ CSV输出包含预测、概率和模型推理
+- ✅ JSON输出包含每个样本的预测、概率和模型推理
 
 ## 安装依赖
 
@@ -54,7 +54,7 @@ load_dotenv()
 python gpt_thyroid_binary_eval.py \
     --image_dir /path/to/images \
     --label_json /path/to/labels.json \
-    --out_csv predictions.csv \
+    --out_json predictions.json \
     --model gpt-4o
 ```
 
@@ -64,7 +64,7 @@ python gpt_thyroid_binary_eval.py \
 python gpt_thyroid_binary_eval.py \
     --image_dir /path/to/images                    # 图像目录 [必需]
     --label_json /path/to/labels.json              # 标签JSON文件 [必需]
-    --out_csv output.csv                           # 输出CSV文件 (默认: gpt_thyroid_preds.csv)
+    --out_json output.json                           # 输出JSON文件 (默认: gpt_thyroid_preds.json)
     --model gpt-4o                                 # 模型选择 (默认: gpt-4o)
     --threshold 0.5                                # 分类阈值 (默认: 0.5)
     --limit 100                                    # 仅评估前N个样本，用于测试 (默认: -1,全部)
@@ -122,17 +122,46 @@ chmod +x gpt_thyroid_eval.sh
 
 ## 输出文件
 
-### CSV输出（predictions CSV）
+### JSON输出（sample records）
 
-```
-filename,gt_malignant,p_malignant,pred_malignant,parsed_prediction,reasoning
-patient001.jpg,0,0.142857,0,0,Model primarily identifies benign characteristics...
-patient002.jpg,1,0.857143,1,1,Image shows suspicious features consistent with...
+```json
+[
+  {
+    "record_type": "sample",
+    "image_file": "patient001.jpg",
+    "image_name": "patient001.jpg",
+    "filename": "patient001.jpg",
+    "selected_model": "gpt-4o",
+    "predicted_class": 0,
+    "confidence": 0.857143,
+    "prob_class_0": 0.857143,
+    "prob_class_1": 0.142857,
+    "true_label": 0,
+    "parsed_prediction": 0,
+    "parsed_confidence": 0.142857,
+    "reasoning": "Model primarily identifies benign characteristics..."
+  },
+  {
+    "record_type": "sample",
+    "image_file": "patient002.jpg",
+    "image_name": "patient002.jpg",
+    "filename": "patient002.jpg",
+    "selected_model": "gpt-4o",
+    "predicted_class": 1,
+    "confidence": 0.857143,
+    "prob_class_0": 0.142857,
+    "prob_class_1": 0.857143,
+    "true_label": 1,
+    "parsed_prediction": 1,
+    "parsed_confidence": 0.857143,
+    "reasoning": "Image shows suspicious features consistent with..."
+  }
+]
 ```
 
-- `gt_malignant`: 真实标签（0=良性，1=恶性）
-- `p_malignant`: 模型预测的恶性概率（0-1）
-- `pred_malignant`: 基于阈值的二分类预测（0或1）
+- `true_label`: 真实标签（0=良性，1=恶性）
+- `prob_class_1`: 模型预测的恶性概率（0-1）
+- `predicted_class`: 基于阈值的二分类预测（0或1）
 - `parsed_prediction`: 模型JSON响应中的预测值
 - `reasoning`: 模型提供的分析原因
 
@@ -157,7 +186,7 @@ Sensitivity:       0.833333 (95% CI 0.760000-0.890000)
 Specificity:       0.869565 (95% CI 0.820000-0.910000)
 Confusion (tn fp fn tp): 60 9 8 23
 --------------------------------------------------------------------------------
-Saved per-image predictions to: gpt_thyroid_preds.csv
+Saved per-sample predictions to: gpt_thyroid_preds.json
 ```
 
 ## Bootstrap置信区间说明
