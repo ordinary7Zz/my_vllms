@@ -1,16 +1,16 @@
 """
-GPT-4V/GPT-4o Thyroid Binary Classification Evaluation Script
+OpenAI-compatible Thyroid Binary Classification Evaluation Script
 
-This script uses OpenAI's vision model to perform thyroid ultrasound nodule 
-malignancy classification and compute comprehensive metrics with bootstrap 
+This script uses an OpenAI-compatible vision model to perform thyroid ultrasound
+nodule malignancy classification and compute comprehensive metrics with bootstrap
 confidence intervals.
 
 Requirements:
   - openai>=1.0.0
   - numpy, pandas, sklearn
-  
+
 Environment:
-  - Set OPENAI_API_KEY environment variable with your API key
+  - Set OPENAI_API_KEY or POE_API_KEY environment variable with your API key
 """
 
 import os
@@ -131,34 +131,58 @@ def classify_with_gpt(
 
     for attempt in range(max_retries):
         try:
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": system_prompt,
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:{media_type};base64,{image_data}",
+            if model in {"gpt-5.5", "gemini-3.5-flash", "gemini-3.1-pro"}:
+                response = client.responses.create(
+                    model=model,
+                    instructions=system_prompt,
+                    input=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "input_image",
+                                    "image_url": f"data:{media_type};base64,{image_data}",
                                 },
-                            },
-                            {
-                                "type": "text",
-                                "text": user_prompt,
-                            },
-                        ],
-                    },
-                ],
-                temperature=temperature,
-                max_tokens=256,
-            )
+                                {
+                                    "type": "input_text",
+                                    "text": user_prompt,
+                                },
+                            ],
+                        }
+                    ],
+                    temperature=temperature,
+                    max_output_tokens=256,
+                )
+                response_text = response.output_text.strip()
+            else:
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": system_prompt,
+                        },
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:{media_type};base64,{image_data}",
+                                    },
+                                },
+                                {
+                                    "type": "text",
+                                    "text": user_prompt,
+                                },
+                            ],
+                        },
+                    ],
+                    temperature=temperature,
+                    max_tokens=256,
+                )
 
-            response_text = response.choices[0].message.content.strip()
+                response_text = response.choices[0].message.content.strip()
 
             # Try to parse JSON response
             try:
@@ -321,14 +345,27 @@ def main():
         "--model",
         type=str,
         default="gpt-4o",
-        choices=["gpt-4-vision-preview", "gpt-4o", "gpt-4o-mini"],
-        help="GPT model to use",
+        choices=[
+            "gpt-4-vision-preview",
+            "gpt-4o",
+            "gpt-4o-mini",
+            "gpt-5.5",
+            "gemini-3.5-flash",
+            "gemini-3.1-pro",
+        ],
+        help="OpenAI-compatible model to use",
     )
     ap.add_argument(
         "--api_key",
         type=str,
         default=None,
-        help="OpenAI API key (default: read from OPENAI_API_KEY env var)",
+        help="API key (default: read from OPENAI_API_KEY or POE_API_KEY env var)",
+    )
+    ap.add_argument(
+        "--base_url",
+        type=str,
+        default=None,
+        help="OpenAI-compatible API base URL (e.g. https://api.poe.com/v1)",
     )
     ap.add_argument(
         "--threshold",
@@ -375,11 +412,15 @@ def main():
     args = ap.parse_args()
 
     # Initialize OpenAI client
-    api_key = args.api_key or os.getenv("OPENAI_API_KEY")
+    api_key = args.api_key or os.getenv("OPENAI_API_KEY") or os.getenv("POE_API_KEY")
     if not api_key:
-        raise ValueError("OPENAI_API_KEY not provided. Set via --api_key or OPENAI_API_KEY env var")
-    
-    client = OpenAI(api_key=api_key)
+        raise ValueError(
+            "API key not provided. Set via --api_key, OPENAI_API_KEY, or POE_API_KEY"
+        )
+
+    base_url = args.base_url or os.getenv("OPENAI_BASE_URL") or os.getenv("POE_API_BASE_URL")
+    client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
+
 
     # Load labels
     labels = load_labels(args.label_json)
