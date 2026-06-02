@@ -1,10 +1,10 @@
 # GPT Vision Models for Thyroid Classification
 
-本目录包含使用OpenAI的GPT视觉模型（如GPT-4o）进行甲状腺超声恶性肿瘤分类的脚本。
+本目录包含使用OpenAI兼容视觉接口（如 OpenAI / Poe）进行甲状腺超声恶性肿瘤分类的脚本。
 
 ## 功能特性
 
-- ✅ 支持多个GPT模型：`gpt-4o`、`gpt-4-vision-preview`、`gpt-4o-mini`
+- ✅ 支持多个OpenAI兼容模型：`gpt-4o`、`gpt-4-vision-preview`、`gpt-4o-mini`、`gpt-5.5`、`gemini-3.5-flash`、`gemini-3.1-pro`
 - ✅ 图像编码为base64，无需本地上传
 - ✅ 结构化JSON响应解析，提取置信度分数
 - ✅ 完整的分类指标计算（AUROC、AUPRC、Accuracy、F1、Sensitivity、Specificity）
@@ -26,6 +26,11 @@ pip install pandas matplotlib seaborn
 
 OpenAI API密钥配置方法：
 
+如果你使用 Poe / 其他 OpenAI-compatible endpoint（例如 `gpt-5.5`、`gemini-3.5-flash`、`gemini-3.1-pro`），请额外设置：
+```bash
+export POE_API_KEY='sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+export POE_API_BASE_URL='https://api.poe.com/v1'
+```
 ### 方法1：环境变量（推荐）
 ```bash
 export OPENAI_API_KEY='sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
@@ -119,6 +124,9 @@ chmod +x gpt_thyroid_eval.sh
 | `gpt-4-vision-preview` | 高 | 最强 | 精确医学诊断 |
 | `gpt-4o` | 中 | 很强 | 平衡选择 |
 | `gpt-4o-mini` | 低 | 良好 | 快速原型/成本敏感 |
+| `gpt-5.5` | 取决于平台 | 很强 | Poe 兼容接口 |
+| `gemini-3.5-flash` | 取决于平台 | 快 | Poe 兼容接口 |
+| `gemini-3.1-pro` | 取决于平台 | 很强 | Poe 兼容接口 |
 
 ## 输出文件
 
