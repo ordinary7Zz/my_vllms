@@ -4,21 +4,22 @@
 # This script evaluates GPT-4o or other OpenAI vision models on thyroid nodule classification
 
 # Configuration
-MODEL="gpt-4o"  # Choose: gpt-4-vision-preview, gpt-4o, gpt-4o-mini
-IMAGE_DIR="/path/to/image/directory"
-LABEL_JSON="/path/to/label.json"
-OUTPUT_JSON="./gpt_thyroid_preds.json"
+MODEL="gpt-5.5"  # Choose: gpt-4-vision-preview, gpt-4o, gpt-4o-mini
+IMAGE_DIR="/mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/sample/images"
+LABEL_JSON="/mnt/wangbd8/workspace/DataSets/ThyroidAgent/train_val_test/sample/sample_test_label.json"
+OUTPUT_JSON="./gpt/outputs/gpt_thyroid_preds.json"
 THRESHOLD=0.5
 BOOTSTRAP_SAMPLES=2000
 
-# OpenAI API Key (直接写在这里，或从环境变量读取)
-OPENAI_API_KEY="sk-***"  # 替换为你的实际API密钥
+# OpenAI API Key（优先读取环境变量，其次使用脚本内配置）
+OPENAI_API_KEY_FILE="sk-your-api-key-here"  # 在这里填写脚本内默认值
+OPENAI_API_KEY="${OPENAI_API_KEY:-$OPENAI_API_KEY_FILE}"
 
 # 确保API密钥已设置
 if [ -z "$OPENAI_API_KEY" ] || [ "$OPENAI_API_KEY" = "sk-your-api-key-here" ]; then
     echo "Error: OPENAI_API_KEY not configured"
-    echo "请编辑此脚本，将 'sk-your-api-key-here' 替换为你的实际OpenAI API密钥"
-    echo "或通过环境变量设置: export OPENAI_API_KEY='sk-xxxxx'"
+    echo "可通过环境变量设置: export OPENAI_API_KEY='sk-xxxxx'"
+    echo "或编辑此脚本，将 OPENAI_API_KEY_FILE 替换为你的实际OpenAI API密钥"
     exit 1
 fi
 
