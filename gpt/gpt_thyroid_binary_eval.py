@@ -17,6 +17,7 @@ import os
 import json
 import argparse
 import base64
+import re
 import time
 from typing import List, Dict, Tuple, Optional
 from pathlib import Path
@@ -40,26 +41,28 @@ try:
 except ImportError:
     raise ImportError("Please install openai: pip install openai")
 
+from debug_print_response_once import print_raw_response_once
+
 
 # ----------------------------
 # Utils
 # ----------------------------
-def load_labels(label_json: str) -> List[Dict]:
+def load_labels(label_json: str, label_key: str) -> List[Dict]:
     """
     Load label JSON file.
     Expected format (list of dict):
-      [{"filename": "...", "malignancy": 0/1}, ...]
+      [{"filename": "...", "<label_key>": 0/1}, ...]
     """
     with open(label_json, "r", encoding="utf-8") as f:
         data = json.load(f)
     if not isinstance(data, list):
         raise ValueError("Label JSON must be a list of records.")
     for r in data:
-        if "filename" not in r or "malignancy" not in r:
-            raise ValueError("Each record must contain keys: filename, malignancy.")
-        r["malignancy"] = int(r["malignancy"])
-        if r["malignancy"] not in (0, 1):
-            raise ValueError(f"malignancy must be 0/1, got {r['malignancy']}")
+        if "filename" not in r or label_key not in r:
+            raise ValueError(f"Each record must contain keys: filename, {label_key}.")
+        r["label"] = int(r[label_key])
+        if r["label"] not in (0, 1):
+            raise ValueError(f"{label_key} must be 0/1, got {r['label']}")
     return data
 
 
@@ -69,56 +72,320 @@ def safe_open_image(path: str) -> Image.Image:
         return img.convert("RGB")
 
 
+TASK_CONFIGS = {
+    "malignancy": {
+        "label_key": "malignancy",
+        "display_name": "thyroid ultrasound benign-vs-malignant classification",
+        "positive_label": "malignant",
+        "negative_label": "benign",
+        "visual_cues": (
+            "Focus on irregular or infiltrative margins, marked hypoechogenicity, microcalcifications, "
+            "taller-than-wide shape, and other suspicious malignant features."
+        ),
+    },
+    "lymph_node_metastasis": {
+        "label_key": "lymph_node_metastasis",
+        "display_name": "thyroid ultrasound cervical lymph node metastasis classification",
+        "positive_label": "yes",
+        "negative_label": "no",
+        "visual_cues": (
+            "Focus on suspicious nodal features such as round shape, loss of fatty hilum, cystic change, "
+            "microcalcifications, abnormal cortical thickening, and abnormal vascularity."
+        ),
+    },
+    "ftc_ptc": {
+        "label_key": "ftc_ptc",
+        "display_name": "thyroid ultrasound FTC-vs-PTC classification",
+        "positive_label": "FTC",
+        "negative_label": "PTC",
+        "visual_cues": (
+            "PTC often shows microcalcifications, marked hypoechogenicity, irregular margins, and taller-than-wide shape, "
+            "whereas FTC may appear more circumscribed or encapsulated-like and may lack classic PTC signs."
+        ),
+    },
+}
+
+
+GEMINI_MODELS = {"gemini-3.5-flash", "gemini-3.1-pro"}
+
+
+def _stringify_detail(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    try:
+        return json.dumps(value, ensure_ascii=False, default=str)
+    except Exception:
+        return str(value)
+
+
+def _gemini_retry_reason(response_text: str, response_status: Optional[str], incomplete_details) -> str:
+    text = (response_text or "").strip()
+    if not text:
+        if response_status == "incomplete":
+            return "response_status=incomplete with empty text"
+        return "empty text"
+
+    if response_status == "incomplete":
+        if re.search(r'"?prediction"?\s*[:=]\s*$', text, flags=re.IGNORECASE):
+            return "response_status=incomplete with missing prediction value"
+        if re.search(r'"?confidence"?\s*[:=]\s*$', text, flags=re.IGNORECASE):
+            return "response_status=incomplete with missing confidence value"
+        if text.count("{") > text.count("}") or text.count("[") > text.count("]"):
+            return "response_status=incomplete with truncated JSON"
+        return "response_status=incomplete"
+
+    if text.count("{") > text.count("}") or text.count("[") > text.count("]"):
+        return "truncated JSON"
+    if text.startswith("```") and not text.rstrip().endswith("```"):
+        return "truncated code fence"
+    if re.search(r'"?prediction"?\s*[:=]\s*$', text, flags=re.IGNORECASE):
+        return "missing prediction value"
+    if re.search(r'"?confidence"?\s*[:=]\s*$', text, flags=re.IGNORECASE):
+        return "missing confidence value"
+
+    return ""
+
+
+def build_prompts(task_name: str) -> Tuple[str, str]:
+    cfg = TASK_CONFIGS[task_name]
+    system_prompt = (
+        "You are an expert medical image classifier for thyroid ultrasound images. "
+        f"The current task is {cfg['display_name']}. "
+        f"Label mapping: 1 = {cfg['positive_label']}, 0 = {cfg['negative_label']}. "
+        f"{cfg['visual_cues']} "
+        "Use only visual evidence from the single input image. "
+        'Output valid JSON only in this exact form: {"prediction": 0 or 1, "risk_score": 0.00 to 100.00}. '
+        "risk_score is a continuous malignancy suspicion score, not a probability. "
+        "Use fine-grained decimals across the full range and avoid coarse bins or stock values. "
+        "Do not output markdown, code fences, explanations, or extra keys."
+    )
+    user_prompt = (
+        f"Task: {cfg['display_name']}.\n"
+        f"1 = {cfg['positive_label']}; 0 = {cfg['negative_label']}.\n"
+        "Classify the image using only visual evidence from the thyroid ultrasound.\n"
+        'Return JSON only: {"prediction": 0 or 1, "risk_score": 0.00 to 100.00}. '
+        "risk_score should be a continuous malignancy suspicion score."
+    )
+    return system_prompt, user_prompt
+
+
+def _strip_code_fences(text: str) -> str:
+    text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\s*```$", "", text)
+    return text.strip()
+
+
+def _json_fragment_candidates(text: str) -> List[str]:
+    candidates = [text]
+    start_positions = [idx for idx in (text.find("{"), text.find("[")) if idx != -1]
+    if start_positions:
+        start = min(start_positions)
+        fragment = text[start:].strip()
+        candidates.append(fragment)
+
+        open_braces = fragment.count("{") - fragment.count("}")
+        open_brackets = fragment.count("[") - fragment.count("]")
+        if open_braces > 0 or open_brackets > 0:
+            repaired = fragment + ("]" * max(open_brackets, 0)) + ("}" * max(open_braces, 0))
+            candidates.append(repaired)
+
+    return candidates
+
+
+def _parse_json_candidate(candidate: str) -> Optional[Dict]:
+    candidate = candidate.strip()
+    if not candidate:
+        return None
+    candidate = re.sub(r",\s*([}\]])", r"\1", candidate)
+    try:
+        parsed = json.loads(candidate)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _extract_binary_fields(parsed: Dict) -> Tuple[Optional[int], Optional[float], Optional[float], Optional[str]]:
+    try:
+        pred = int(parsed.get("prediction"))
+    except (TypeError, ValueError):
+        return None, None, None, "prediction_missing_or_invalid"
+
+    if pred not in (0, 1):
+        return None, None, None, "prediction_out_of_range"
+
+    score_raw = parsed.get("risk_score")
+    if score_raw is not None:
+        try:
+            risk_score = float(score_raw)
+        except (TypeError, ValueError):
+            return None, None, None, "risk_score_invalid"
+        if not 0.0 <= risk_score <= 100.0:
+            return None, None, None, "risk_score_out_of_range"
+        prob_malignant = risk_score / 100.0
+        return pred, prob_malignant, risk_score, ""
+
+    prob_raw = parsed.get("prob_malignant", parsed.get("malignant_probability"))
+    if prob_raw is not None:
+        try:
+            prob_malignant = float(prob_raw)
+        except (TypeError, ValueError):
+            return None, None, None, "prob_malignant_invalid"
+        if not 0.0 <= prob_malignant <= 1.0:
+            return None, None, None, "prob_malignant_out_of_range"
+        return pred, prob_malignant, prob_malignant * 100.0, ""
+
+    conf_raw = parsed.get("confidence")
+    try:
+        confidence = float(conf_raw)
+    except (TypeError, ValueError):
+        return None, None, None, "confidence_missing_or_invalid"
+
+    if not 0.0 <= confidence <= 1.0:
+        return None, None, None, "confidence_out_of_range"
+
+    prob_malignant = confidence if pred == 1 else 1.0 - confidence
+    return pred, prob_malignant, prob_malignant * 100.0, ""
+
+
+def _summarize_parse_failure(text: str) -> str:
+    stripped = text.strip()
+    if not stripped:
+        return "empty_response"
+    if stripped.startswith("```") and not stripped.rstrip().endswith("```"):
+        return "truncated_code_fence"
+    if re.search(r'"?prediction"?\s*[:=]\s*$', stripped, flags=re.IGNORECASE):
+        return "prediction_value_missing"
+    if re.search(r'"?(?:risk_score|confidence)"?\s*[:=]\s*$', stripped, flags=re.IGNORECASE):
+        return "risk_score_value_missing"
+    if stripped.count("{") > stripped.count("}") or stripped.count("[") > stripped.count("]"):
+        return "truncated_json"
+    if "prediction" in stripped.lower():
+        return "prediction_not_recovered"
+    if "risk_score" in stripped.lower() or "confidence" in stripped.lower():
+        return "risk_score_not_recovered"
+    return "unrecoverable_json"
+
+
+def parse_binary_response(response_text: str) -> Tuple[Optional[int], Optional[float], Optional[float], str]:
+    text = _strip_code_fences(response_text or "")
+    if not text:
+        return None, None, None, "empty_response"
+
+    parsed = None
+    for candidate in _json_fragment_candidates(text):
+        parsed = _parse_json_candidate(candidate)
+        if parsed is not None:
+            break
+
+    if isinstance(parsed, dict):
+        pred, prob_malignant, parsed_risk_score, reason = _extract_binary_fields(parsed)
+        if pred is not None and prob_malignant is not None:
+            return pred, prob_malignant, parsed_risk_score, ""
+        return None, None, None, reason or _summarize_parse_failure(text)
+
+    match = re.search(r'"?prediction"?\s*[:=]\s*["\']?([01])["\']?', text, flags=re.IGNORECASE)
+    if match:
+        pred = int(match.group(1))
+        risk_match = re.search(r'"?risk_score"?\s*[:=]\s*["\']?([0-9]*\.?[0-9]+)', text, flags=re.IGNORECASE)
+        if risk_match:
+            risk_score = float(risk_match.group(1))
+            if 0.0 <= risk_score <= 100.0:
+                prob_malignant = risk_score / 100.0
+                return pred, prob_malignant, risk_score, ""
+            return None, None, None, "risk_score_out_of_range"
+        legacy_match = re.search(r'"?(?:confidence|prob_malignant)"?\s*[:=]\s*["\']?([0-9]*\.?[0-9]+)', text, flags=re.IGNORECASE)
+        if legacy_match:
+            confidence = float(legacy_match.group(1))
+            if 0.0 <= confidence <= 1.0:
+                prob_malignant = confidence if pred == 1 else 1.0 - confidence
+                return pred, prob_malignant, confidence * 100.0, ""
+            return None, None, None, "confidence_out_of_range"
+        prob_malignant = 1.0 if pred == 1 else 0.0
+        return pred, prob_malignant, None, ""
+
+    match = re.match(r"^\s*([01])(?:\s|$)", text)
+    if match:
+        pred = int(match.group(1))
+        prob_malignant = 1.0 if pred == 1 else 0.0
+        return pred, prob_malignant, None, ""
+
+    return None, None, None, _summarize_parse_failure(text)
+
+
 def image_to_base64(image_path: str) -> str:
     """Convert image file to base64 string."""
     with open(image_path, "rb") as image_file:
         return base64.standard_b64encode(image_file.read()).decode("utf-8")
 
 
+def extract_response_text(response) -> str:
+    text = getattr(response, "output_text", None)
+    if isinstance(text, str) and text.strip():
+        return text.strip()
+
+    output = getattr(response, "output", None)
+    if output:
+        parts: List[str] = []
+        for item in output:
+            content = getattr(item, "content", None)
+            if content is None and isinstance(item, dict):
+                content = item.get("content")
+
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, str):
+                        parts.append(block)
+                    elif isinstance(block, dict):
+                        if block.get("type") in {"output_text", "text"}:
+                            parts.append(str(block.get("text", "")))
+                        elif "text" in block:
+                            parts.append(str(block.get("text", "")))
+                    else:
+                        block_text = getattr(block, "text", None)
+                        if block_text is not None:
+                            parts.append(str(block_text))
+            elif isinstance(content, str):
+                parts.append(content)
+
+        text = "".join(parts).strip()
+        if text:
+            return text
+
+    choices = getattr(response, "choices", None)
+    if choices:
+        for choice in choices:
+            message = getattr(choice, "message", None)
+            if message is None and isinstance(choice, dict):
+                message = choice.get("message")
+            if message is None:
+                continue
+            content = getattr(message, "content", None)
+            if content is None and isinstance(message, dict):
+                content = message.get("content")
+            if isinstance(content, str) and content.strip():
+                return content.strip()
+
+    return ""
+
+
 def classify_with_gpt(
     client: OpenAI,
     image_path: str,
+    system_prompt: str,
+    user_prompt: str,
     model: str = "gpt-4-vision-preview",
-    temperature: float = 0.0,
     max_retries: int = 3,
     retry_delay: float = 2.0,
-) -> Tuple[float, Dict[str, str]]:
+) -> Tuple[float, Dict[str, object]]:
     """
-    Classify thyroid nodule malignancy using OpenAI's GPT model with vision capability.
-    
-    Args:
-        client: OpenAI client instance
-        image_path: Path to the image file
-        model: Model name (gpt-4-vision-preview, gpt-4o, etc.)
-        temperature: Model temperature (0.0 for deterministic)
-        max_retries: Maximum number of retry attempts
-        retry_delay: Delay between retries in seconds
-    
-    Returns:
-        Tuple of (malignancy_probability: float, debug_info: Dict)
-        
-    The function extracts probability from the model's response using regex patterns.
-    If the model responds with a confidence score, it's normalized to [0,1].
+    Classify a thyroid ultrasound image using an OpenAI-compatible model.
     """
-    system_prompt = (
-        "You are an expert radiologist specializing in thyroid ultrasound analysis. "
-        "Your task is to classify thyroid nodules as benign (0) or malignant (1) based on ultrasound images. "
-        "Provide your classification and a confidence score.\n\n"
-        "IMPORTANT: You MUST respond in JSON format like this:\n"
-        '{"prediction": 0 or 1, "confidence": 0.0-1.0, "reasoning": "brief explanation"}\n'
-        "The confidence field should be a probability between 0 and 1, where 0=certain benign, 1=certain malignant."
-    )
-
-    user_prompt = (
-        "Please analyze this thyroid ultrasound image and classify the nodule malignancy. "
-        "Respond ONLY in JSON format with prediction (0=benign, 1=malignant), "
-        "confidence (0.0-1.0), and brief reasoning."
-    )
-
-    # Encode image to base64
     image_data = image_to_base64(image_path)
-    
-    # Get file extension to determine media type
+
     ext = Path(image_path).suffix.lower()
     media_type_map = {
         ".jpg": "image/jpeg",
@@ -131,7 +398,11 @@ def classify_with_gpt(
 
     for attempt in range(max_retries):
         try:
-            if model in {"gpt-5.5", "gemini-3.5-flash", "gemini-3.1-pro"}:
+            response_text = ""
+            response_status = ""
+            response_incomplete_details = ""
+
+            if model in GEMINI_MODELS:
                 response = client.responses.create(
                     model=model,
                     instructions=system_prompt,
@@ -150,11 +421,23 @@ def classify_with_gpt(
                             ],
                         }
                     ],
-                    temperature=temperature,
-                    max_output_tokens=256,
+                    max_output_tokens=512,
+                    reasoning={"effort": "none"},
                 )
-                response_text = response.output_text.strip()
-            else:
+                print_raw_response_once(response)
+                response_text = extract_response_text(response)
+                response_status = str(getattr(response, "status", "") or "")
+                response_incomplete_details = _stringify_detail(getattr(response, "incomplete_details", None))
+
+                retry_reason = _gemini_retry_reason(response_text, response_status, response_incomplete_details)
+                if retry_reason and attempt < max_retries - 1:
+                    wait_time = retry_delay * (2 ** attempt)
+                    detail_suffix = f"; details={response_incomplete_details}" if response_incomplete_details else ""
+                    print(f"  Gemini response looks truncated ({retry_reason}{detail_suffix}). Waiting {wait_time}s before retry...")
+                    time.sleep(wait_time)
+                    continue
+
+            if not response_text:
                 response = client.chat.completions.create(
                     model=model,
                     messages=[
@@ -178,47 +461,54 @@ def classify_with_gpt(
                             ],
                         },
                     ],
-                    temperature=temperature,
-                    max_tokens=256,
+                    max_tokens=128,
                 )
+                print_raw_response_once(response)
+                response_text = extract_response_text(response)
+                response_status = str(getattr(response, "status", "") or "chat_completions")
+                response_incomplete_details = _stringify_detail(getattr(response, "incomplete_details", None))
 
-                response_text = response.choices[0].message.content.strip()
-
-            # Try to parse JSON response
-            try:
-                # Find JSON in response (in case of extra text)
-                import re
-                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-                if json_match:
-                    json_str = json_match.group()
-                    result = json.loads(json_str)
-                    confidence = float(result.get("confidence", 0.5))
-                    # Ensure confidence is in [0, 1]
-                    confidence = max(0.0, min(1.0, confidence))
-                    
-                    return confidence, {
-                        "raw_response": response_text,
-                        "parsed_prediction": result.get("prediction", -1),
-                        "parsed_confidence": confidence,
-                        "reasoning": result.get("reasoning", ""),
-                    }
-            except (json.JSONDecodeError, ValueError, AttributeError):
-                # If JSON parsing fails, return 0.5 (neutral)
+            pred, prob_malignant, parsed_risk_score, parse_reason = parse_binary_response(response_text)
+            if pred is None or prob_malignant is None:
+                failure_reason = parse_reason or _summarize_parse_failure(response_text)
+                if response_status:
+                    status_bits = [f"response_status={response_status}"]
+                    if response_incomplete_details:
+                        status_bits.append(f"incomplete_details={response_incomplete_details}")
+                    failure_reason = f"{failure_reason} ({', '.join(status_bits)})"
                 return 0.5, {
                     "raw_response": response_text,
                     "parsed_prediction": -1,
                     "parsed_confidence": 0.5,
+                    "parsed_risk_score": 50.0,
+                    "parsed_prob_malignant": 0.5,
+                    "prob_malignant": 0.5,
                     "reasoning": "Failed to parse response",
+                    "parse_failure_reason": failure_reason,
+                    "response_status": response_status,
+                    "response_incomplete_details": response_incomplete_details,
                 }
 
-        except RateLimitError as e:
+            return prob_malignant, {
+                "raw_response": response_text,
+                "parsed_prediction": pred,
+                "parsed_confidence": prob_malignant,
+                "parsed_risk_score": parsed_risk_score if parsed_risk_score is not None else prob_malignant * 100.0,
+                "parsed_prob_malignant": prob_malignant,
+                "prob_malignant": prob_malignant,
+                "reasoning": "",
+                "parse_failure_reason": "",
+                "response_status": response_status,
+                "response_incomplete_details": response_incomplete_details,
+            }
+
+        except RateLimitError:
             if attempt < max_retries - 1:
-                wait_time = retry_delay * (2 ** attempt)  # Exponential backoff
+                wait_time = retry_delay * (2 ** attempt)
                 print(f"  Rate limited. Waiting {wait_time}s before retry...")
                 time.sleep(wait_time)
                 continue
-            else:
-                raise
+            raise
 
     raise RuntimeError(f"Failed to classify image after {max_retries} attempts")
 
@@ -336,6 +626,19 @@ def main():
         help="Label json path, e.g. /path/to/test_label.json",
     )
     ap.add_argument(
+        "--task",
+        type=str,
+        required=True,
+        choices=list(TASK_CONFIGS.keys()),
+        help="Classification task to run",
+    )
+    ap.add_argument(
+        "--label_key",
+        type=str,
+        default=None,
+        help="Label field name inside label_json (default depends on --task)",
+    )
+    ap.add_argument(
         "--out_json",
         type=str,
         default="gpt_thyroid_preds.json",
@@ -423,12 +726,16 @@ def main():
 
 
     # Load labels
-    labels = load_labels(args.label_json)
+    task_config = TASK_CONFIGS[args.task]
+    label_key = args.label_key or task_config["label_key"]
+    system_prompt, user_prompt = build_prompts(args.task)
+    labels = load_labels(args.label_json, label_key)
     if args.limit is not None and args.limit > 0:
         labels = labels[: args.limit]
 
-    print(f"Loaded {len(labels)} labels from {args.label_json}")
-    print(f"Using model: {args.model}")
+    print(f"Loaded {len(labels)} labels from {args.label_json} (label_key={label_key})")
+    print(f"Task:              {args.task}")
+    print(f"Using model:       {args.model}")
 
     y_true: List[int] = []
     y_prob: List[float] = []
@@ -441,7 +748,7 @@ def main():
 
     for r in tqdm(labels, desc="Infer"):
             fn = r["filename"]
-            gt = int(r["malignancy"])
+            gt = int(r["label"])
 
             img_path = os.path.join(args.image_dir, fn)
             if not os.path.exists(img_path):
@@ -460,8 +767,9 @@ def main():
                 p1, dbg = classify_with_gpt(
                     client=client,
                     image_path=img_path,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
                     model=args.model,
-                    temperature=0.0,
                     max_retries=args.max_retries,
                     retry_delay=args.retry_delay,
                 )
@@ -469,7 +777,17 @@ def main():
                 api_errors += 1
                 print(f"  API error for {fn}: {e}")
                 p1 = 0.5  # Default to uncertain
-                dbg = {"reasoning": f"API error: {str(e)}", "parsed_prediction": -1}
+                dbg = {
+                    "reasoning": f"API error: {str(e)}",
+                    "parsed_prediction": -1,
+                    "parsed_confidence": 0.5,
+                    "parsed_risk_score": 50.0,
+                    "parsed_prob_malignant": 0.5,
+                    "prob_malignant": 0.5,
+                    "parse_failure_reason": "api_error",
+                    "response_status": "",
+                    "response_incomplete_details": "",
+                }
 
             pred = 1 if p1 >= args.threshold else 0
             p0 = 1.0 - p1
@@ -483,14 +801,24 @@ def main():
                     "image_file": img_path,
                     "image_name": fn,
                     "filename": fn,
+                    "selected_task": args.task,
+                    "label_key": label_key,
                     "selected_model": args.model,
                     "predicted_class": pred,
-                    "confidence": float(max(p0, p1)),
+                    "confidence": float(dbg.get("parsed_confidence", p1)),
+                    "risk_score": float(dbg.get("parsed_risk_score", p1 * 100.0)),
+                    "prob_malignant": float(dbg.get("parsed_prob_malignant", p1)),
                     "prob_class_0": float(p0),
                     "prob_class_1": float(p1),
                     "true_label": gt,
                     "parsed_prediction": dbg.get("parsed_prediction", -1),
                     "parsed_confidence": dbg.get("parsed_confidence", p1),
+                    "parsed_risk_score": dbg.get("parsed_risk_score", p1 * 100.0),
+                    "parsed_prob_malignant": dbg.get("parsed_prob_malignant", p1),
+                    "parse_failure_reason": dbg.get("parse_failure_reason", ""),
+                    "response_status": dbg.get("response_status", ""),
+                    "response_incomplete_details": dbg.get("response_incomplete_details", ""),
+                    "raw_response": dbg.get("raw_response", ""),
                     "reasoning": dbg.get("reasoning", ""),
                 }
             )
@@ -511,7 +839,7 @@ def main():
     )
 
     print("\n" + "=" * 80)
-    print("GPT Thyroid Binary Classification Metrics (pos=malignant=1)")
+    print(f"GPT Thyroid Binary Classification Metrics ({args.task}, 1={task_config['positive_label']}, 0={task_config['negative_label']})")
     print("=" * 80)
     print(f"Model:             {args.model}")
     print(f"Evaluated samples: {len(y_true)}")
@@ -540,6 +868,7 @@ def main():
     )
     print(f"Confusion (tn fp fn tp): {metrics['tn']} {metrics['fp']} {metrics['fn']} {metrics['tp']}")
     print("-" * 80)
+    Path(args.out_json).parent.mkdir(parents=True, exist_ok=True)
     with open(args.out_json, "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
 

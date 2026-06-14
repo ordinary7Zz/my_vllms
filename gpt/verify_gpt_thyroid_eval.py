@@ -17,7 +17,7 @@ except ImportError:
     print("FAIL: openai package is not installed. Run: pip install openai")
     sys.exit(1)
 
-DEFAULT_MODEL = "gpt-5.5"
+DEFAULT_MODEL = "gemini-3.1-pro"
 DEFAULT_BASE_URL = "https://api.poe.com/v1"
 TEXT_MODELS = {"gpt-5.5", "gemini-3.5-flash", "gemini-3.1-pro"}
 
